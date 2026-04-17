@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "connections": [
+    {
+      "id": "main-app",
+      "displayName": "My RemoteApp",
+      "serverAddress": "your-server.example.com",
+      "port": 3389,
+      "remoteAppProgram": "||MyApp",
+      "remoteAppName": "My Application",
+      "remoteAppCmdLine": "",
+      "gatewayHostname": "",
+      "certThumbprint": "AB12CD34EF56789012345678901234567890ABCD",
+      "rdpFileUrlPattern": "https://your-bucket.s3.amazonaws.com/rdp/users/{userId}.rdp",
+      "signingCertUrl": "https://your-bucket.s3.amazonaws.com/rdp/signing-cert.cer"
+    }
+  ],
+  "launcherVersion": "1.0.0",
+  "launcherDownloadUrl": "https://your-bucket.s3.amazonaws.com/rdp/RdpLauncherSetup.exe",
+  "updatedAt": "2026-04-17T00:00:00Z"
+}

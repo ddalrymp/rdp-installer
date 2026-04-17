@@ -1,0 +1,32 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Build outputs
+publish/
+installer/publish/
+installer/Output/
+server/output/
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## IDE
+.idea/
+*.swp
+*~
+
+## Certificates (don't commit real certs)
+*.pfx
+*.p12
+# signing-cert.cer is intentionally tracked as a placeholder
+
+## Temp files
+*.tmp
+*.log
