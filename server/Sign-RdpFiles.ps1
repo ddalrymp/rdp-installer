@@ -60,7 +60,7 @@ if (-not (Test-Path $InputDir)) {
     exit 1
 }
 
-$rdpFiles = Get-ChildItem -Path $InputDir -Filter "*.rdp" -File
+$rdpFiles = @(Get-ChildItem -Path $InputDir -Filter "*.rdp" -File)
 if ($rdpFiles.Count -eq 0) {
     Write-Error "No .rdp files found in: $InputDir"
     exit 1
@@ -112,7 +112,7 @@ foreach ($rdpFile in $rdpFiles) {
     try {
         $output = & $rdpsignPath $destPath /sha256 $CertThumbprint 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "  FAILED: $($rdpFile.Name) — rdpsign exit code $LASTEXITCODE"
+            Write-Warning "  FAILED: $($rdpFile.Name) rdpsign exit code $LASTEXITCODE"
             Write-Warning "  Output: $output"
             Remove-Item -Path $destPath -Force -ErrorAction SilentlyContinue
             $failCount++
@@ -123,7 +123,7 @@ foreach ($rdpFile in $rdpFiles) {
         }
     }
     catch {
-        Write-Warning "  FAILED: $($rdpFile.Name) — $_"
+        Write-Warning "  FAILED: $($rdpFile.Name) $_"
         Remove-Item -Path $destPath -Force -ErrorAction SilentlyContinue
         $failCount++
     }
