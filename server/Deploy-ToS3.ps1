@@ -62,7 +62,7 @@ if (-not (Test-Path $usersDir)) {
     exit 1
 }
 
-$rdpCount = (Get-ChildItem -Path $usersDir -Filter "*.rdp" -File).Count
+$rdpCount = @(Get-ChildItem -Path $usersDir -Filter "*.rdp" -File).Count
 if ($rdpCount -eq 0) {
     Write-Error "No .rdp files found in $usersDir."
     exit 1
@@ -96,15 +96,25 @@ $args += $awsArgs
 & aws @args
 if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upload signing-cert.cer"; exit 1 }
 
-# Sync users/ directory (bulk .rdp files)
-Write-Host "  Syncing $rdpCount .rdp file(s) from users/ ..." -ForegroundColor Gray
-$args = @("s3", "sync", $usersDir, "$s3Base/users/",
-          "--content-type", "application/x-rdp",
-          "--cache-control", "no-cache, no-store, must-revalidate",
-          "--delete")
-$args += $awsArgs
-& aws @args
-if ($LASTEXITCODE -ne 0) { Write-Error "Failed to sync users/ directory"; exit 1 }
+# Upload each .rdp file individually (avoids needing s3:ListBucket permission)
+Write-Host "  Uploading $rdpCount .rdp file(s) from users/ ..." -ForegroundColor Gray
+$uploadFailed = 0
+foreach ($rdpFile in (Get-ChildItem -Path $usersDir -Filter "*.rdp" -File)) {
+    $s3Key = "$s3Base/users/$($rdpFile.Name)"
+    $cpArgs = @("s3", "cp", $rdpFile.FullName, $s3Key,
+                "--content-type", "application/x-rdp",
+                "--cache-control", "no-cache, no-store, must-revalidate")
+    $cpArgs += $awsArgs
+    & aws @cpArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "  Failed to upload $($rdpFile.Name)"
+        $uploadFailed++
+    }
+}
+if ($uploadFailed -gt 0) {
+    Write-Error "$uploadFailed file(s) failed to upload."
+    exit 1
+}
 
 Write-Host ""
 Write-Host "=== Upload Complete ===" -ForegroundColor Green
