@@ -19,9 +19,9 @@ A lightweight Windows launcher that gives clients a **one-click, no-prompts** co
 
 ## Quick Start
 
-### 1. Server-Side Setup
+### 1. Server-Side: Sign & Upload RDP Files
 
-On your RDS server (or any Windows machine with the signing certificate):
+Run this on **each** RDS server where your `.rdp` files live:
 
 1. **Generate your `.rdp` files** using your existing creation script (one per user, e.g., `ORG1_U01.rdp`, `ORG1_U02.rdp`, etc.)
 
@@ -44,29 +44,40 @@ This signs all `.rdp` files, exports the signing certificate, and updates `confi
 .\Deploy-ToS3.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
 ```
 
+> **Multiple servers?** Run steps 1-3 on each server. The `signing-cert.cer` and `config.json` are regenerated from the certificate each time — they are not server-specific.
+
 ### 2. Build the Launcher
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on a **Windows** machine:
 
 ```powershell
 # Update the config URL in appsettings.json first
-dotnet publish src/RdpLauncher -c Release -o installer/publish
+dotnet publish src/RdpLauncher/RdpLauncher.csproj -c Release -o installer/publish
 ```
 
 ### 3. Build the Installer
 
 Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
-1. Place your `signing-cert.cer` in `installer/`
-2. Place an `icon.ico` in `installer/assets/` (or remove the `SetupIconFile` line from `setup.iss`)
-3. Update `ConfigUrl` in `installer/setup.iss` to your hosted config URL
-4. Open `installer/setup.iss` in Inno Setup and compile
+1. **Download the signing certificate from S3** (so the installer can bundle it):
+
+```powershell
+cd installer
+.\Prepare-Installer.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
+```
+
+2. Update `ConfigUrl` in `setup.iss` to your hosted config URL
+3. Open `setup.iss` in Inno Setup and compile
 
 This produces `installer/Output/RdpLauncherSetup.exe`.
 
-### 4. Distribute to Clients
+### 4. Upload & Distribute the Installer
 
-Upload `RdpLauncherSetup.exe` to your download page. Clients run the installer once, enter their user code when prompted, then use the desktop shortcut to connect.
+```powershell
+.\Deploy-Installer.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
+```
+
+Clients download the installer, run it once, enter their user code when prompted, then use the desktop shortcut to connect.
 
 **Silent install with user code:**
 ```
@@ -132,6 +143,8 @@ rdp-installer/
 │   └── RdpLauncher.Tests/        # xUnit unit tests
 ├── installer/
 │   ├── setup.iss                 # Inno Setup script (with user code page)
+│   ├── Prepare-Installer.ps1    # Download signing-cert.cer from S3
+│   ├── Deploy-Installer.ps1     # Upload compiled installer to S3
 │   └── assets/                   # Icon and installer resources
 ├── server/
 │   ├── config.json               # Config template (rdpFileUrlPattern)
