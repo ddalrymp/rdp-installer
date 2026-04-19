@@ -136,13 +136,18 @@ begin
     RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
       'UserCode', GetUserCode());
 
-    // Suppress Windows 11 24H2 RDP Resource Access Consent dialog
-    // ShellExec with 'runas' verb triggers a proper UAC prompt from the installer window
+    // Suppress the one-time RDP educational warning dialog (HKCU, no elevation needed)
+    RegWriteDWordValue(HKEY_CURRENT_USER,
+      'Software\Microsoft\Terminal Server Client',
+      'RdpLaunchConsentAccepted', 1);
+
+    // Revert the KB5083769 RDP security/redirection dialog to pre-update behavior
+    // Requires HKLM write under ...\Terminal Services\Client (elevation needed)
     if not ShellExec('runas', 'reg.exe',
-      'add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableResourceConsent /t REG_DWORD /d 1 /f',
+      'add "HKLM\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /t REG_DWORD /d 1 /f',
       '', SW_HIDE, ewWaitUntilTerminated, ErrorCode) then
     begin
-      Log('Warning: Could not set RDP consent policy. Error code: ' + IntToStr(ErrorCode));
+      Log('Warning: Could not set RDP redirection dialog policy. Error code: ' + IntToStr(ErrorCode));
     end;
   end;
 end;
@@ -153,9 +158,14 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    // Remove the RDP consent policy
+    // Remove the RDP educational consent flag
+    RegDeleteValue(HKEY_CURRENT_USER,
+      'Software\Microsoft\Terminal Server Client',
+      'RdpLaunchConsentAccepted');
+
+    // Remove the RDP redirection dialog policy
     ShellExec('runas', 'reg.exe',
-      'delete "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableResourceConsent /f',
+      'delete "HKLM\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /f',
       '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
   end;
 end;
