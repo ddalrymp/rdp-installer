@@ -63,15 +63,19 @@ dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publis
 
 ### 3. Download FreeRDP
 
-Download the FreeRDP Windows x64 release and place it in `installer\freerdp\`:
+Downloads the version specified in `appsettings.json` from `pub.freerdp.com`:
 
 ```powershell
-# Create the freerdp directory
-New-Item -ItemType Directory -Path installer\freerdp -Force
+# Read version from appsettings.json
+$version = (Get-Content src\RdpLauncher\appsettings.json | ConvertFrom-Json).FreeRdpVersion
 
-# Download latest stable release from GitHub
-# https://github.com/FreeRDP/FreeRDP/releases
-# Extract wfreerdp.exe and all DLLs into installer\freerdp\
+# Download and extract to installer\freerdp\
+New-Item -ItemType Directory -Path installer\freerdp -Force
+$url = "https://pub.freerdp.com/releases/freerdp-$version.zip"
+$zip = "$env:TEMP\freerdp-$version.zip"
+Invoke-WebRequest -Uri $url -OutFile $zip
+Expand-Archive -Path $zip -DestinationPath installer\freerdp -Force
+Remove-Item $zip
 ```
 
 See [docs/freerdp-version.md](docs/freerdp-version.md) for the version pinning checklist.
@@ -198,7 +202,8 @@ rdp-installer/
   "ConfigUrl": "https://your-bucket.s3.amazonaws.com/rdp/config.json",
   "ConnectionId": "main-app",
   "ConfigCacheTtlMinutes": 60,
-  "AppDataFolder": "RdpLauncher"
+  "AppDataFolder": "RdpLauncher",
+  "FreeRdpVersion": "3.24.2"
 }
 ```
 
@@ -229,7 +234,11 @@ notepad src\RdpLauncher\appsettings.json
 dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publish
 
 # 4. Ensure FreeRDP binaries are in installer\freerdp\
-#    (wfreerdp.exe + DLLs from GitHub release)
+$v = (Get-Content src\RdpLauncher\appsettings.json | ConvertFrom-Json).FreeRdpVersion
+New-Item -ItemType Directory -Path installer\freerdp -Force
+Invoke-WebRequest "https://pub.freerdp.com/releases/freerdp-$v.zip" -OutFile "$env:TEMP\freerdp.zip"
+Expand-Archive "$env:TEMP\freerdp.zip" -DestinationPath installer\freerdp -Force
+Remove-Item "$env:TEMP\freerdp.zip"
 
 # 5. Download signing cert
 cd installer
