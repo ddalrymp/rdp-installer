@@ -67,12 +67,6 @@ Filename: "powershell.exe"; \
     Flags: runhidden waituntilterminated; \
     StatusMsg: "Installing security certificate..."
 
-; Suppress Windows 11 24H2 RDP Resource Access Consent dialog (writes to HKLM, requires UAC elevation)
-Filename: "powershell.exe"; \
-    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ Start-Process cmd.exe -ArgumentList '/c reg add """"HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"""" /v fDisableResourceConsent /t REG_DWORD /d 1 /f' -Verb RunAs -Wait }} catch {{ Write-Host 'Warning: Could not set RDP consent policy. You may see resource prompts.' }}"""; \
-    Flags: runhidden waituntilterminated; \
-    StatusMsg: "Configuring RDP resource consent settings..."
-
 ; Optionally launch the app after install
 Filename: "{app}\{#MyAppExeName}"; \
     Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; \
@@ -82,11 +76,6 @@ Filename: "{app}\{#MyAppExeName}"; \
 ; Remove the signing certificate from TrustedPublisher on uninstall
 Filename: "powershell.exe"; \
     Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('TrustedPublisher', 'CurrentUser'); $store.Open('ReadWrite'); $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('{app}\signing-cert.cer'); $found = $store.Certificates.Find('FindByThumbprint', $cert.Thumbprint, $false); foreach ($c in $found) {{ $store.Remove($c) }}; $store.Close() }} catch {{ }}"""; \
-    Flags: runhidden waituntilterminated
-
-; Remove the RDP consent policy on uninstall
-Filename: "powershell.exe"; \
-    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ Start-Process cmd.exe -ArgumentList '/c reg delete """"HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"""" /v fDisableResourceConsent /f' -Verb RunAs -Wait }} catch {{ }}"""; \
     Flags: runhidden waituntilterminated
 
 [UninstallDelete]
@@ -138,12 +127,36 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ErrorCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
     // Write the user code to the registry
     RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
       'UserCode', GetUserCode());
+
+    // Suppress Windows 11 24H2 RDP Resource Access Consent dialog
+    // ShellExec with 'runas' verb triggers a proper UAC prompt from the installer window
+    if not ShellExec('runas', 'reg.exe',
+      'add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableResourceConsent /t REG_DWORD /d 1 /f',
+      '', SW_HIDE, ewWaitUntilTerminated, ErrorCode) then
+    begin
+      Log('Warning: Could not set RDP consent policy. Error code: ' + IntToStr(ErrorCode));
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ErrorCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    // Remove the RDP consent policy
+    ShellExec('runas', 'reg.exe',
+      'delete "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableResourceConsent /f',
+      '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
   end;
 end;
 
