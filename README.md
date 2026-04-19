@@ -1,6 +1,6 @@
 # RDP RemoteApp Launcher & Installer
 
-A lightweight Windows launcher that gives clients a **one-click, no-prompts** connection to a published RemoteApp. Supports **100+ users** with per-user `.rdp` files — a single universal installer prompts for (or accepts) a user code, then fetches the correct signed `.rdp` file on each launch. Certificate rotations are handled automatically without reinstalling.
+A lightweight Windows launcher that gives clients a **one-click, no-prompts** connection to a published RemoteApp. Uses **FreeRDP** as the primary client (with mstsc.exe fallback) to eliminate Windows 11 24H2 consent dialogs. Supports **100+ users** via a templated config with `{ORGID}` and `{USERID}` placeholders — a single universal installer works for all organizations.
 
 ## Architecture
 
@@ -8,12 +8,12 @@ A lightweight Windows launcher that gives clients a **one-click, no-prompts** co
 ┌──────────────────────────┐         ┌──────────────────────────┐
 │   S3 / Web Server        │         │   Client PC              │
 │                          │  HTTPS  │                          │
-│  config.json             │◄────────│  RdpLauncher.exe         │
-│  users/ORG1_U01.rdp      │         │   ├─ Read user code      │
+│  config.json (template)  │◄────────│  RdpLauncher.exe         │
+│  users/ORG1_U01.rdp      │         │   ├─ Load OrgId/UserId   │
 │  users/ORG1_U02.rdp      │         │   ├─ Fetch config.json   │
-│  users/...               │         │   ├─ Download user .rdp  │
-│  signing-cert.cer        │         │   ├─ Import cert         │
-│  RdpLauncherSetup.exe    │         │   └─ Launch mstsc.exe    │
+│  users/...               │         │   ├─ Resolve templates   │
+│  signing-cert.cer        │         │   ├─ Launch wfreerdp.exe │
+│  RdpLauncherSetup.exe    │         │   └─ (mstsc fallback)    │
 └──────────────────────────┘         └──────────────────────────┘
 ```
 
@@ -48,14 +48,35 @@ This signs all `.rdp` files, exports the signing certificate, and updates `confi
 
 ### 2. Build the Launcher
 
-Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on a **Windows** machine:
+Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on your **Windows Server**:
 
 ```powershell
-# Update the config URL in appsettings.json first
-dotnet publish src/RdpLauncher/RdpLauncher.csproj -c Release -o installer/publish
+# Clone or pull the latest code on your build server
+cd C:\Path\To\rdp-installer
+
+# Update the config URL in appsettings.json to your hosted endpoint
+notepad src\RdpLauncher\appsettings.json
+
+# Publish the launcher (self-contained, single-file)
+dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publish
 ```
 
-### 3. Build the Installer
+### 3. Download FreeRDP
+
+Download the FreeRDP Windows x64 release and place it in `installer\freerdp\`:
+
+```powershell
+# Create the freerdp directory
+New-Item -ItemType Directory -Path installer\freerdp -Force
+
+# Download latest stable release from GitHub
+# https://github.com/FreeRDP/FreeRDP/releases
+# Extract wfreerdp.exe and all DLLs into installer\freerdp\
+```
+
+See [docs/freerdp-version.md](docs/freerdp-version.md) for the version pinning checklist.
+
+### 4. Build the Installer
 
 Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
@@ -67,40 +88,49 @@ cd installer
 ```
 
 2. Update `ConfigUrl` in `setup.iss` to your hosted config URL
-3. Open `setup.iss` in Inno Setup and compile
+3. Compile the installer:
 
-This produces `installer/Output/RdpLauncherSetup.exe`.
+```powershell
+# Command-line build (Inno Setup must be in PATH or use full path)
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
+```
 
-### 4. Upload & Distribute the Installer
+This produces `installer\Output\RdpLauncherSetup.exe`.
+
+### 5. Upload & Distribute the Installer
 
 ```powershell
 .\Deploy-Installer.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
 ```
 
-Clients download the installer, run it once, enter their user code when prompted, then use the desktop shortcut to connect.
+Clients download the installer, run it once, enter their Org ID and User ID when prompted, then use the desktop shortcut to connect. Password is entered on first launch by the app itself.
 
-**Silent install with user code:**
+**Silent install:**
 ```
-RdpLauncherSetup.exe /SILENT /USERCODE=ORG1_U01
+RdpLauncherSetup.exe /SILENT /ORGID=ORG1 /USERID=U01
 ```
 
 ## How It Works
 
 **On install:**
-- Launcher `.exe` is installed to `%LocalAppData%\RdpLauncher\`
-- Signing certificate is imported into `CurrentUser\TrustedPublisher`
-- User code is collected (installer page or `/USERCODE` param) and saved to registry
+- Launcher `.exe` + FreeRDP binaries installed to `%LocalAppData%\RdpLauncher\`
+- Signing certificate is imported into `CurrentUser\TrustedPublisher` (for mstsc fallback)
+- Org ID and User ID are collected (installer page or `/ORGID` + `/USERID` params) and saved to registry
 - Desktop shortcut and Start Menu entry are created
 - Config URL is written to `HKCU\Software\RdpLauncher\ConfigUrl`
+- RDP consent dialog suppression keys are set (for mstsc fallback)
 
 **On each launch:**
-1. Reads user code from `HKCU\Software\RdpLauncher\UserCode` (prompts if missing)
-2. Fetches `config.json` from the hosted endpoint
-3. Compares the cert thumbprint with the cached version
-4. If changed: downloads the new signed `.rdp` for this user (via URL pattern)
-5. Imports the new cert to `TrustedPublisher` if needed
-6. Copies `.rdp` to a temp file and launches `mstsc.exe`
-7. Cleans up the temp file after the session ends
+1. Loads OrgId/UserId from registry; opens Settings if missing
+2. Prompts for password if not saved (DPAPI-encrypted in registry)
+3. Fetches `config.json` from the hosted endpoint (cached with TTL)
+4. Resolves `{ORGID}` and `{USERID}` placeholders in config values
+5. Launches `wfreerdp.exe` with RAIL mode for true floating RemoteApp windows
+6. Passes credentials via stdin (not visible in process list)
+7. On success: saves password for next time
+8. On FreeRDP failure (if `fallbackToMstsc` enabled): falls back to mstsc.exe with .rdp file
+5. On FreeRDP failure (if fallback enabled): uses mstsc.exe with downloaded .rdp file
+6. Cleans up temp files after the session ends
 
 **On cert rotation:**
 1. Re-run `Sign-RdpFiles.ps1` with the new certificate thumbprint
@@ -132,25 +162,30 @@ rdp-installer/
 ├── src/
 │   ├── RdpLauncher/              # C# .NET 8 WinForms launcher
 │   │   ├── Program.cs            # Entry point
-│   │   ├── LauncherForm.cs       # UI + orchestration
-│   │   ├── ConfigService.cs      # Fetch & cache config.json
-│   │   ├── RdpFileManager.cs     # Download & cache .rdp files
+│   │   ├── LauncherForm.cs       # UI + orchestration (gear icon, workflow)
+│   │   ├── ConfigService.cs      # Fetch, cache & resolve config templates
+│   │   ├── CredentialManager.cs  # DPAPI password storage, registry identity
+│   │   ├── CredentialPrompt.cs   # Password input dialog
+│   │   ├── SettingsForm.cs       # Settings UI (org/user/password)
+│   │   ├── FreeRdpLauncher.cs    # wfreerdp.exe RAIL launcher
+│   │   ├── ProcessLauncher.cs    # FreeRDP → mstsc fallback orchestrator
+│   │   ├── RdpFileManager.cs     # Download & cache .rdp files (fallback)
 │   │   ├── CertificateManager.cs # Import certs to TrustedPublisher
-│   │   ├── ProcessLauncher.cs    # Launch mstsc.exe and monitor
 │   │   ├── UpdateChecker.cs      # Version comparison + update prompt
-│   │   ├── UserCodePrompt.cs     # First-run user code input dialog
-│   │   └── appsettings.json      # Default config URL
+│   │   └── appsettings.json      # Default config URL + cache TTL
 │   └── RdpLauncher.Tests/        # xUnit unit tests
 ├── installer/
-│   ├── setup.iss                 # Inno Setup script (with user code page)
+│   ├── setup.iss                 # Inno Setup script (OrgId + UserId pages)
+│   ├── freerdp/                  # Bundled wfreerdp.exe + DLLs (pinned version)
 │   ├── Prepare-Installer.ps1    # Download signing-cert.cer from S3
 │   ├── Deploy-Installer.ps1     # Upload compiled installer to S3
 │   └── assets/                   # Icon and installer resources
 ├── server/
-│   ├── config.json               # Config template (rdpFileUrlPattern)
+│   ├── config.json               # Config template ({ORGID}/{USERID} placeholders)
 │   ├── Sign-RdpFiles.ps1         # Bulk-sign existing .rdp files
 │   └── Deploy-ToS3.ps1           # Upload to S3
 └── docs/
+    ├── freerdp-version.md        # FreeRDP version pinning & update guide
     └── setup-guide.md            # End-user setup instructions
 ```
 
@@ -162,6 +197,7 @@ rdp-installer/
 {
   "ConfigUrl": "https://your-bucket.s3.amazonaws.com/rdp/config.json",
   "ConnectionId": "main-app",
+  "ConfigCacheTtlMinutes": 60,
   "AppDataFolder": "RdpLauncher"
 }
 ```
@@ -173,9 +209,37 @@ The installer writes the config URL to `HKCU\Software\RdpLauncher\ConfigUrl`. Th
 ## Requirements
 
 - **Server**: Windows Server with RDS role, public CA-issued certificate, `rdpsign.exe`
-- **Build**: .NET 8 SDK (Windows), Inno Setup 6
+- **Build**: .NET 8 SDK (Windows), Inno Setup 6, FreeRDP Windows x64 release
 - **Client**: Windows 10/11, no admin rights required (installs to user profile)
 
 ## macOS Support (Planned)
 
 A future phase will add macOS support via a `.pkg` installer + shell script using FreeRDP (`xfreerdp`), reusing the same server-side config endpoint.
+
+## Build Summary (Windows Server Quick Reference)
+
+```powershell
+# 1. Pull latest code
+git pull
+
+# 2. Edit config URL
+notepad src\RdpLauncher\appsettings.json
+
+# 3. Publish .NET app
+dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publish
+
+# 4. Ensure FreeRDP binaries are in installer\freerdp\
+#    (wfreerdp.exe + DLLs from GitHub release)
+
+# 5. Download signing cert
+cd installer
+.\Prepare-Installer.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
+cd ..
+
+# 6. Compile installer
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
+
+# 7. Upload installer
+cd installer
+.\Deploy-Installer.ps1 -BucketName "your-bucket" -BucketPrefix "rdp"
+```

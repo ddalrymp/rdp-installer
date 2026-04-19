@@ -7,23 +7,32 @@ public sealed class LauncherForm : Form
 {
     private readonly Label _statusLabel;
     private readonly ProgressBar _progressBar;
+    private readonly Button _settingsButton;
 
     private readonly string _configUrl;
     private readonly string _connectionId;
     private readonly string _cacheDir;
-    private string _userCode;
+    private readonly int _cacheTtlMinutes;
+    private readonly CredentialManager _credentials;
 
     public LauncherForm()
     {
         // --- Load settings ---
         var settings = LoadSettings();
         _configUrl = GetConfigUrl(settings);
-        _connectionId = settings.GetProperty("ConnectionId").GetString() ?? "main-app";
-        var appDataFolder = settings.GetProperty("AppDataFolder").GetString() ?? "RdpLauncher";
+        _connectionId = settings.TryGetProperty("ConnectionId", out var connProp)
+            ? connProp.GetString() ?? "main-app" : "main-app";
+        var appDataFolder = settings.TryGetProperty("AppDataFolder", out var folderProp)
+            ? folderProp.GetString() ?? "RdpLauncher" : "RdpLauncher";
+        _cacheTtlMinutes = settings.TryGetProperty("ConfigCacheTtlMinutes", out var ttlProp)
+            ? ttlProp.GetInt32() : 60;
         _cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             appDataFolder, "cache");
-        _userCode = GetUserCode();
+
+        // --- Load credentials ---
+        _credentials = new CredentialManager();
+        _credentials.Load();
 
         // --- Form setup ---
         Text = "RDP Launcher";
@@ -34,11 +43,23 @@ public sealed class LauncherForm : Form
         MinimizeBox = false;
         ShowInTaskbar = true;
 
+        _settingsButton = new Button
+        {
+            Text = "\u2699",  // gear icon
+            Location = new System.Drawing.Point(350, 5),
+            Size = new System.Drawing.Size(30, 30),
+            FlatStyle = FlatStyle.Flat,
+            Font = new System.Drawing.Font("Segoe UI", 12f)
+        };
+        _settingsButton.FlatAppearance.BorderSize = 0;
+        _settingsButton.Click += OnSettingsClick;
+        Controls.Add(_settingsButton);
+
         _statusLabel = new Label
         {
             Text = "Connecting...",
             Location = new System.Drawing.Point(20, 20),
-            Size = new System.Drawing.Size(340, 25),
+            Size = new System.Drawing.Size(320, 25),
             Font = new System.Drawing.Font("Segoe UI", 10f)
         };
         Controls.Add(_statusLabel);
@@ -60,24 +81,32 @@ public sealed class LauncherForm : Form
     {
         try
         {
-            // Step 0: Ensure we have a user code
-            if (string.IsNullOrEmpty(_userCode))
+            // Step 0: Ensure we have identity (OrgId + UserId)
+            if (!_credentials.HasCredentials)
             {
-                using var prompt = new UserCodePrompt();
-                if (prompt.ShowDialog(this) != DialogResult.OK ||
-                    string.IsNullOrWhiteSpace(prompt.UserCode))
+                using var settingsForm = new SettingsForm(_credentials);
+                if (settingsForm.ShowDialog(this) != DialogResult.OK || !_credentials.HasCredentials)
                 {
                     Close();
                     return;
                 }
-
-                _userCode = prompt.UserCode;
-                SaveUserCode(_userCode);
             }
 
-            // Step 1: Fetch config
+            // Step 1: Ensure we have a password
+            if (!_credentials.HasPassword)
+            {
+                using var prompt = new CredentialPrompt(_credentials.Username);
+                if (prompt.ShowDialog(this) != DialogResult.OK)
+                {
+                    Close();
+                    return;
+                }
+                _credentials.SetPassword(prompt.Password);
+            }
+
+            // Step 2: Fetch config
             UpdateStatus("Checking for updates...");
-            var configService = new ConfigService(_configUrl, _cacheDir);
+            var configService = new ConfigService(_configUrl, _cacheDir, _cacheTtlMinutes);
             var (config, fromCache) = await configService.GetConfigAsync();
 
             if (config == null)
@@ -92,15 +121,16 @@ public sealed class LauncherForm : Form
                 UpdateStatus("Using cached settings (offline mode)...");
             }
 
-            // Step 2: Get the target connection
-            var connection = ConfigService.GetConnection(config, _connectionId);
+            // Step 3: Get the target connection (with template resolution)
+            var connection = ConfigService.GetConnection(
+                config, _connectionId, _credentials.OrgId, _credentials.UserId);
             if (connection == null)
             {
                 ShowError($"Connection '{_connectionId}' not found in configuration.");
                 return;
             }
 
-            // Step 3: Check for launcher update
+            // Step 4: Check for launcher update
             if (!fromCache && UpdateChecker.IsUpdateAvailable(config))
             {
                 var result = MessageBox.Show(
@@ -120,66 +150,25 @@ public sealed class LauncherForm : Form
                 }
             }
 
-            // Step 4: Ensure cert is trusted
-            if (!string.IsNullOrEmpty(connection.CertThumbprint) &&
-                !CertificateManager.IsCertificateTrusted(connection.CertThumbprint))
-            {
-                UpdateStatus("Installing security certificate...");
-
-                bool certImported;
-                if (!fromCache && !string.IsNullOrEmpty(connection.SigningCertUrl))
-                {
-                    certImported = await CertificateManager.DownloadAndImportCertificateAsync(
-                        connection.SigningCertUrl, _cacheDir);
-                }
-                else
-                {
-                    certImported = CertificateManager.ImportFromCache(_cacheDir);
-                }
-
-                if (!certImported)
-                {
-                    // Non-fatal: connection may still work, user will just see a trust prompt
-                    UpdateStatus("Certificate import skipped. You may see a trust prompt.");
-                    await Task.Delay(1500);
-                }
-            }
-
-            // Step 5: Ensure .rdp file is available
-            UpdateStatus($"Preparing connection to {connection.DisplayName}...");
-            var cachedThumbprint = configService.GetCachedThumbprint(_connectionId);
-            var rdpManager = new RdpFileManager(_cacheDir);
-            var rdpPath = await rdpManager.EnsureRdpFileAsync(connection, cachedThumbprint, _userCode);
-
-            if (rdpPath == null)
-            {
-                var detail = rdpManager.LastError ?? "Unknown error";
-                ShowError($"Unable to download the connection file.\n\n{detail}");
-                return;
-            }
-
-            // Step 6: Prepare temp copy and launch
-            var tempRdpPath = RdpFileManager.PrepareForLaunch(rdpPath);
-            if (tempRdpPath == null)
-            {
-                ShowError("Unable to prepare the connection file.");
-                return;
-            }
-
+            // Step 5: Launch via FreeRDP (primary) or mstsc (fallback)
             UpdateStatus($"Launching {connection.DisplayName}...");
-
-            // Hide the form while the RDP session is active
             Hide();
 
-            var exitCode = await ProcessLauncher.LaunchAndWaitAsync(tempRdpPath);
+            var password = _credentials.GetPassword()!;
+            var exitCode = await ProcessLauncher.LaunchAsync(
+                connection, _credentials.Username, password,
+                _cacheDir, config.FallbackToMstsc);
 
             if (exitCode == -1)
             {
                 Show();
                 ShowError("Failed to launch Remote Desktop.\n\n" +
-                    "Ensure mstsc.exe is available on this system.");
+                    ProcessLauncher.LastError);
                 return;
             }
+
+            // Successful connection — save password if not already saved
+            _credentials.SavePassword();
 
             // Session ended normally — close the launcher
             Close();
@@ -187,6 +176,16 @@ public sealed class LauncherForm : Form
         catch (Exception ex)
         {
             ShowError($"An unexpected error occurred:\n\n{ex.Message}");
+        }
+    }
+
+    private void OnSettingsClick(object? sender, EventArgs e)
+    {
+        using var settingsForm = new SettingsForm(_credentials);
+        if (settingsForm.ShowDialog(this) == DialogResult.OK && settingsForm.CredentialsChanged)
+        {
+            // Re-run workflow with new credentials
+            _ = RunConnectionWorkflowAsync();
         }
     }
 
@@ -263,41 +262,5 @@ public sealed class LauncherForm : Form
         }
 
         return "";
-    }
-
-    /// <summary>
-    /// Reads the user code from the registry (set by installer or first-run prompt).
-    /// </summary>
-    private static string GetUserCode()
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(@"Software\RdpLauncher");
-            var code = key?.GetValue("UserCode") as string;
-            if (!string.IsNullOrEmpty(code))
-                return code;
-        }
-        catch
-        {
-            // Registry not available — fall through
-        }
-
-        return "";
-    }
-
-    /// <summary>
-    /// Saves the user code to the registry for subsequent launches.
-    /// </summary>
-    private static void SaveUserCode(string userCode)
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.CreateSubKey(@"Software\RdpLauncher");
-            key.SetValue("UserCode", userCode);
-        }
-        catch
-        {
-            // Non-fatal: user will be prompted again next time
-        }
     }
 }

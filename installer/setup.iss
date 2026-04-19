@@ -6,12 +6,13 @@
 ; Before building:
 ; 1. Publish the .NET app: dotnet publish src/RdpLauncher -c Release
 ; 2. Place the published output in installer/publish/
-; 3. Place your signing-cert.cer in installer/
-; 4. (Optional) Place icon.ico in installer/assets/
+; 3. Place FreeRDP files in installer/freerdp/ (wfreerdp.exe + DLLs)
+; 4. Place your signing-cert.cer in installer/
+; 5. (Optional) Place icon.ico in installer/assets/
 ; ============================================================
 
 #define MyAppName "RDP Launcher"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Your Company Name"
 #define MyAppExeName "RdpLauncher.exe"
 #define MyAppId "RdpLauncher"
@@ -44,7 +45,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Application files (from dotnet publish output)
 Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
-; Signing certificate for RDP trust
+; FreeRDP binaries (bundled, pinned version)
+Source: "freerdp\*"; DestDir: "{app}\freerdp"; Flags: ignoreversion recursesubdirs
+
+; Signing certificate for RDP trust (mstsc fallback)
 Source: "signing-cert.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -58,12 +62,12 @@ Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "Config
 ; Store the install path for reference
 Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 
-; User code is written by the [Code] section after the input page
+; OrgId and UserId are written by the [Code] section after the input page
 
 [Run]
-; Import the signing certificate into TrustedPublisher after installation
+; Import the signing certificate into TrustedPublisher after installation (for mstsc fallback)
 Filename: "powershell.exe"; \
-    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('{app}\signing-cert.cer'); $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('TrustedPublisher', 'CurrentUser'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close(); Write-Host 'Certificate imported successfully.' }} catch {{ Write-Host 'Warning: Certificate import failed. You may see trust prompts.' }}"""; \
+    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('{app}\signing-cert.cer'); $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('TrustedPublisher', 'CurrentUser'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close(); Write-Host 'Certificate imported successfully.' }} catch {{ Write-Host 'Warning: Certificate import failed.' }}"""; \
     Flags: runhidden waituntilterminated; \
     StatusMsg: "Installing security certificate..."
 
@@ -84,43 +88,56 @@ Type: filesandordirs; Name: "{localappdata}\{#MyAppId}\cache"
 
 [Code]
 var
-  UserCodePage: TInputQueryWizardPage;
+  IdentityPage: TInputQueryWizardPage;
 
-function GetUserCode(): String;
+function GetOrgId(): String;
 var
-  CmdLineCode: String;
+  CmdLineVal: String;
 begin
-  // Command-line param takes priority: /USERCODE=ORG1_U01
-  CmdLineCode := ExpandConstant('{param:USERCODE|}');
-  if CmdLineCode <> '' then
-    Result := Trim(CmdLineCode)
-  else if Assigned(UserCodePage) then
-    Result := Trim(UserCodePage.Values[0])
+  CmdLineVal := ExpandConstant('{param:ORGID|}');
+  if CmdLineVal <> '' then
+    Result := Trim(CmdLineVal)
+  else if Assigned(IdentityPage) then
+    Result := Trim(IdentityPage.Values[0])
+  else
+    Result := '';
+end;
+
+function GetUserId(): String;
+var
+  CmdLineVal: String;
+begin
+  CmdLineVal := ExpandConstant('{param:USERID|}');
+  if CmdLineVal <> '' then
+    Result := Trim(CmdLineVal)
+  else if Assigned(IdentityPage) then
+    Result := Trim(IdentityPage.Values[1])
   else
     Result := '';
 end;
 
 procedure InitializeWizard();
 begin
-  // Only show the input page if /USERCODE was NOT provided on the command line
-  if ExpandConstant('{param:USERCODE|}') = '' then
+  // Only show the input page if neither /ORGID nor /USERID were provided
+  if (ExpandConstant('{param:ORGID|}') = '') or (ExpandConstant('{param:USERID|}') = '') then
   begin
-    UserCodePage := CreateInputQueryPage(wpSelectDir,
-      'User Code',
-      'Enter the user code provided to you.',
-      'This identifies your personal connection file (e.g., ORG1_U01).');
-    UserCodePage.Add('User Code:', False);
+    IdentityPage := CreateInputQueryPage(wpSelectDir,
+      'Organization & User',
+      'Enter your organization and user identifiers.',
+      'These identify your connection settings (e.g., ORG1 and U01).');
+    IdentityPage.Add('Organization ID:', False);
+    IdentityPage.Add('User ID:', False);
   end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  if Assigned(UserCodePage) and (CurPageID = UserCodePage.ID) then
+  if Assigned(IdentityPage) and (CurPageID = IdentityPage.ID) then
   begin
-    if Trim(UserCodePage.Values[0]) = '' then
+    if (Trim(IdentityPage.Values[0]) = '') or (Trim(IdentityPage.Values[1]) = '') then
     begin
-      MsgBox('Please enter your user code.', mbError, MB_OK);
+      MsgBox('Please enter both Organization ID and User ID.', mbError, MB_OK);
       Result := False;
     end;
   end;
@@ -132,17 +149,18 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // Write the user code to the registry
+    // Write identity to the registry
     RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
-      'UserCode', GetUserCode());
+      'OrgId', GetOrgId());
+    RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
+      'UserId', GetUserId());
 
-    // Suppress the one-time RDP educational warning dialog (HKCU, no elevation needed)
+    // Suppress the one-time RDP educational warning dialog (for mstsc fallback)
     RegWriteDWordValue(HKEY_CURRENT_USER,
       'Software\Microsoft\Terminal Server Client',
       'RdpLaunchConsentAccepted', 1);
 
-    // Revert the KB5083769 RDP security/redirection dialog to pre-update behavior
-    // Requires HKLM write under ...\Terminal Services\Client (elevation needed)
+    // Revert the KB5083769 RDP security/redirection dialog (for mstsc fallback)
     if not ShellExec('runas', 'reg.exe',
       'add "HKLM\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /t REG_DWORD /d 1 /f',
       '', SW_HIDE, ewWaitUntilTerminated, ErrorCode) then
@@ -167,6 +185,9 @@ begin
     ShellExec('runas', 'reg.exe',
       'delete "HKLM\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /f',
       '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
+
+    // Clean up credential registry entries
+    RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\{#MyAppId}');
   end;
 end;
 
