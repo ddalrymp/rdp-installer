@@ -58,6 +58,10 @@ Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "Config
 ; Store the install path for reference
 Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 
+; Suppress Windows 11 24H2 RDP Resource Access Consent dialog
+; so .rdp file resource settings (drives, clipboard, printers, etc.) are honored automatically
+Root: HKCU; Subkey: "SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"; ValueType: dword; ValueName: "fDisableResourceConsent"; ValueData: "1"; Flags: uninsdeletevalue
+
 ; User code is written by the [Code] section after the input page
 
 [Run]
