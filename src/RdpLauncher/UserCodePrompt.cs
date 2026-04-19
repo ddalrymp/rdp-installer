@@ -34,8 +34,7 @@ public sealed class UserCodePrompt : Form
         {
             Location = new System.Drawing.Point(15, 45),
             Size = new System.Drawing.Size(335, 25),
-            Font = new System.Drawing.Font("Segoe UI", 10f),
-            CharacterCasing = CharacterCasing.Upper
+            Font = new System.Drawing.Font("Segoe UI", 10f)
         };
         _textBox.KeyDown += (_, e) =>
         {

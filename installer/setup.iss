@@ -93,9 +93,9 @@ begin
   // Command-line param takes priority: /USERCODE=ORG1_U01
   CmdLineCode := ExpandConstant('{param:USERCODE|}');
   if CmdLineCode <> '' then
-    Result := Uppercase(CmdLineCode)
+    Result := Trim(CmdLineCode)
   else if Assigned(UserCodePage) then
-    Result := Uppercase(UserCodePage.Values[0])
+    Result := Trim(UserCodePage.Values[0])
   else
     Result := '';
 end;
