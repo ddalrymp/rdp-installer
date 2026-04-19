@@ -153,8 +153,8 @@ public sealed class LauncherForm : Form
 
             if (rdpPath == null)
             {
-                ShowError("Unable to download the connection file.\n\n" +
-                    "Please check your internet connection and try again.");
+                var detail = rdpManager.LastError ?? "Unknown error";
+                ShowError($"Unable to download the connection file.\n\n{detail}");
                 return;
             }
 

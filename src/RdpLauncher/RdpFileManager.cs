@@ -9,6 +9,11 @@ public sealed class RdpFileManager
     private readonly string _cacheDir;
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Contains diagnostic details about the last failed operation.
+    /// </summary>
+    public string? LastError { get; private set; }
+
     public RdpFileManager(string cacheDir, HttpClient? httpClient = null)
     {
         _cacheDir = cacheDir;
@@ -22,6 +27,7 @@ public sealed class RdpFileManager
     /// </summary>
     public async Task<string?> EnsureRdpFileAsync(ConnectionInfo connection, string? cachedThumbprint, string? userId = null)
     {
+        LastError = null;
         var cacheFileName = !string.IsNullOrEmpty(userId) ? $"{userId}.rdp" : $"{connection.Id}.rdp";
         var cachedRdpPath = Path.Combine(_cacheDir, cacheFileName);
         var thumbprintChanged = !string.Equals(
@@ -31,15 +37,22 @@ public sealed class RdpFileManager
         {
             var rdpUrl = ResolveRdpUrl(connection, userId);
             if (string.IsNullOrEmpty(rdpUrl))
-                return File.Exists(cachedRdpPath) ? cachedRdpPath : null;
-
-            var downloaded = await DownloadRdpFileAsync(rdpUrl, cachedRdpPath);
-            if (!downloaded && File.Exists(cachedRdpPath))
             {
-                // Download failed but we have a cached copy — use it
-                return cachedRdpPath;
+                LastError = $"No download URL resolved. userId=\"{userId}\", " +
+                    $"rdpFileUrlPattern=\"{connection.RdpFileUrlPattern}\", " +
+                    $"rdpFileUrl=\"{connection.RdpFileUrl}\"";
+                return File.Exists(cachedRdpPath) ? cachedRdpPath : null;
             }
-            return downloaded ? cachedRdpPath : null;
+
+            var (downloaded, error) = await DownloadRdpFileAsync(rdpUrl, cachedRdpPath);
+            if (!downloaded)
+            {
+                LastError = $"Download failed: {rdpUrl}\n{error}";
+                if (File.Exists(cachedRdpPath))
+                    return cachedRdpPath;
+                return null;
+            }
+            return cachedRdpPath;
         }
 
         return cachedRdpPath;
@@ -118,19 +131,28 @@ public sealed class RdpFileManager
         }
     }
 
-    private async Task<bool> DownloadRdpFileAsync(string rdpUrl, string destinationPath)
+    private async Task<(bool Success, string? Error)> DownloadRdpFileAsync(string rdpUrl, string destinationPath)
     {
         try
         {
-            var content = await _httpClient.GetByteArrayAsync(rdpUrl);
+            var response = await _httpClient.GetAsync(rdpUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+            }
 
+            var content = await response.Content.ReadAsByteArrayAsync();
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             await File.WriteAllBytesAsync(destinationPath, content);
-            return true;
+            return (true, null);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (HttpRequestException ex)
         {
-            return false;
+            return (false, $"Network error: {ex.Message}");
+        }
+        catch (TaskCanceledException)
+        {
+            return (false, "Request timed out");
         }
     }
 }
