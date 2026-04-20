@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace RdpLauncher;
@@ -44,6 +45,11 @@ public sealed class FreeRdpLauncher
             Logger.Error(LastError);
             return -1;
         }
+
+        // Remove Mark of the Web (MOTW) from all files in the freerdp folder.
+        // Downloaded files carry a Zone.Identifier stream that causes SmartScreen
+        // to block them when launched programmatically (no UI for the trust dialog).
+        UnblockFreeRdpFiles();
 
         var args = BuildArguments(connection, username);
         Logger.Debug($"  Command: {_wfreerdpPath} {args}");
@@ -153,4 +159,43 @@ public sealed class FreeRdpLauncher
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Removes the Zone.Identifier alternate data stream (Mark of the Web) from
+    /// wfreerdp.exe and all files in its directory. Files downloaded from the
+    /// internet carry this stream, which causes SmartScreen to block them when
+    /// launched programmatically with no UI for the trust prompt.
+    /// Uses DeleteFile on the ":Zone.Identifier" ADS — this is the same thing
+    /// PowerShell's Unblock-File does under the hood.
+    /// </summary>
+    private void UnblockFreeRdpFiles()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_wfreerdpPath);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+
+            var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);
+            var unblocked = 0;
+
+            foreach (var file in files)
+            {
+                var zoneStream = file + ":Zone.Identifier";
+                if (DeleteFile(zoneStream))
+                    unblocked++;
+            }
+
+            if (unblocked > 0)
+                Logger.Info($"Unblocked {unblocked} file(s) in {dir} (removed MOTW Zone.Identifier).");
+            else
+                Logger.Debug("No MOTW Zone.Identifier streams found on FreeRDP files.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Failed to unblock FreeRDP files: {ex.Message}");
+        }
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool DeleteFile(string lpFileName);
 }

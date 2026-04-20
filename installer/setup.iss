@@ -63,6 +63,12 @@ Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "Config
 Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 
 [Run]
+; Remove Mark of the Web (MOTW) from bundled FreeRDP files so SmartScreen does not block them
+Filename: "powershell.exe"; \
+    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Get-ChildItem -Path '{app}\freerdp' -Recurse | Unblock-File -ErrorAction SilentlyContinue"""; \
+    Flags: runhidden waituntilterminated; \
+    StatusMsg: "Unblocking FreeRDP files..."
+
 ; Import the signing certificate into TrustedPublisher after installation (for mstsc fallback)
 Filename: "powershell.exe"; \
     Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""try {{ $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('{app}\signing-cert.cer'); $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('TrustedPublisher', 'CurrentUser'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close(); Write-Host 'Certificate imported successfully.' }} catch {{ Write-Host 'Warning: Certificate import failed.' }}"""; \
