@@ -30,6 +30,12 @@ public sealed class LauncherForm : Form
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             appDataFolder, "cache");
 
+        Logger.Info("=== RDP Launcher starting ===");
+        Logger.Debug($"ConfigUrl: {_configUrl}");
+        Logger.Debug($"ConnectionId: {_connectionId}");
+        Logger.Debug($"CacheDir: {_cacheDir}");
+        Logger.Debug($"CacheTTL: {_cacheTtlMinutes} min");
+
         // --- Load credentials ---
         _credentials = new CredentialManager();
         _credentials.Load();
@@ -81,58 +87,73 @@ public sealed class LauncherForm : Form
     {
         try
         {
-            // Step 0: Ensure we have identity (OrgId + UserId)
-            if (!_credentials.HasCredentials)
-            {
-                using var settingsForm = new SettingsForm(_credentials);
-                if (settingsForm.ShowDialog(this) != DialogResult.OK || !_credentials.HasCredentials)
-                {
-                    Close();
-                    return;
-                }
-            }
+            Logger.Info("Starting connection workflow...");
 
-            // Step 1: Ensure we have a password
-            if (!_credentials.HasPassword)
+            // Step 0: Ensure we have all credentials (Organization + Username + Password)
+            if (!_credentials.HasIdentity || !_credentials.HasPassword)
             {
-                using var prompt = new CredentialPrompt(_credentials.Username);
+                Logger.Debug($"Credentials incomplete. HasIdentity: {_credentials.HasIdentity}, HasPassword: {_credentials.HasPassword}");
+                using var prompt = new CredentialPrompt(_credentials.Organization, _credentials.Username);
                 if (prompt.ShowDialog(this) != DialogResult.OK)
                 {
+                    Logger.Info("User cancelled credential prompt. Closing.");
                     Close();
                     return;
                 }
+
+                _credentials.SaveIdentity(prompt.Organization, prompt.EnteredUsername);
                 _credentials.SetPassword(prompt.Password);
+
+                if (prompt.RememberAll)
+                    _credentials.SavePassword();
+
+                Logger.Info($"Credentials entered. Organization: {_credentials.Organization}, Username: {_credentials.Username}");
+            }
+            else
+            {
+                Logger.Info($"Using saved credentials. Organization: {_credentials.Organization}, Username: {_credentials.Username}");
             }
 
-            // Step 2: Fetch config
+            // Step 1: Fetch config
             UpdateStatus("Checking for updates...");
+            Logger.Info($"Fetching config from: {_configUrl}");
             var configService = new ConfigService(_configUrl, _cacheDir, _cacheTtlMinutes);
             var (config, fromCache) = await configService.GetConfigAsync();
 
             if (config == null)
             {
+                Logger.Error("Config is null. Unable to load connection settings.");
                 ShowError("Unable to load connection settings.\n\n" +
                     "Please check your internet connection and try again.");
                 return;
             }
+
+            Logger.Info($"Config loaded (fromCache: {fromCache}). Version: {config.Version}, Connections: {config.Connections.Count}");
 
             if (fromCache)
             {
                 UpdateStatus("Using cached settings (offline mode)...");
             }
 
-            // Step 3: Get the target connection (with template resolution)
+            // Step 2: Get the target connection (with template resolution)
             var connection = ConfigService.GetConnection(
-                config, _connectionId, _credentials.OrgId, _credentials.UserId);
+                config, _connectionId, _credentials.Organization, _credentials.Username);
             if (connection == null)
             {
+                Logger.Error($"Connection '{_connectionId}' not found in configuration.");
                 ShowError($"Connection '{_connectionId}' not found in configuration.");
                 return;
             }
 
-            // Step 4: Check for launcher update
+            Logger.Info($"Connection resolved: {connection.DisplayName} -> {connection.ServerAddress}:{connection.Port}");
+            Logger.Debug($"  RemoteApp: {connection.RemoteAppProgram}");
+            Logger.Debug($"  Domain: {connection.Domain}");
+            Logger.Debug($"  Gateway: {connection.GatewayHostname}");
+
+            // Step 3: Check for launcher update
             if (!fromCache && UpdateChecker.IsUpdateAvailable(config))
             {
+                Logger.Info($"Update available: {config.LauncherVersion}");
                 var result = MessageBox.Show(
                     $"A new version of the launcher is available.\n\n" +
                     $"Current: {UpdateChecker.GetCurrentVersion()}\n" +
@@ -150,8 +171,9 @@ public sealed class LauncherForm : Form
                 }
             }
 
-            // Step 5: Launch via FreeRDP (primary) or mstsc (fallback)
+            // Step 4: Launch via FreeRDP (primary) or mstsc (fallback)
             UpdateStatus($"Launching {connection.DisplayName}...");
+            Logger.Info($"Launching connection: {connection.DisplayName}");
             Hide();
 
             var password = _credentials.GetPassword()!;
@@ -161,11 +183,14 @@ public sealed class LauncherForm : Form
 
             if (exitCode == -1)
             {
+                Logger.Error($"Launch failed. LastError: {ProcessLauncher.LastError}");
                 Show();
                 ShowError("Failed to launch Remote Desktop.\n\n" +
                     ProcessLauncher.LastError);
                 return;
             }
+
+            Logger.Info($"Session completed with exit code: {exitCode}");
 
             // Successful connection — save password if not already saved
             _credentials.SavePassword();
@@ -175,6 +200,7 @@ public sealed class LauncherForm : Form
         }
         catch (Exception ex)
         {
+            Logger.Error("Unexpected error in connection workflow", ex);
             ShowError($"An unexpected error occurred:\n\n{ex.Message}");
         }
     }

@@ -179,7 +179,9 @@ public sealed class ConfigService
 
         return value
             .Replace("{ORGID}", orgId, StringComparison.OrdinalIgnoreCase)
-            .Replace("{USERID}", userId, StringComparison.OrdinalIgnoreCase);
+            .Replace("{ORG}", orgId, StringComparison.OrdinalIgnoreCase)
+            .Replace("{USERID}", userId, StringComparison.OrdinalIgnoreCase)
+            .Replace("{USERNAME}", userId, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsCacheFresh()

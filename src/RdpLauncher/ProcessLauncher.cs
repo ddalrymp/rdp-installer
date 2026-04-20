@@ -19,26 +19,44 @@ public static class ProcessLauncher
         string cacheDir, bool fallbackToMstsc)
     {
         LastError = null;
+        Logger.Info("ProcessLauncher.LaunchAsync started");
+        Logger.Debug($"  Connection: {connection.ServerAddress}:{connection.Port}");
+        Logger.Debug($"  FallbackToMstsc: {fallbackToMstsc}");
 
         // --- Try FreeRDP first ---
         var freeRdp = new FreeRdpLauncher();
         if (freeRdp.IsAvailable)
         {
+            Logger.Info("FreeRDP is available, attempting launch...");
             var exitCode = await freeRdp.LaunchAsync(connection, username, password);
             if (exitCode == 0)
+            {
+                Logger.Info("FreeRDP session completed successfully.");
                 return 0;
+            }
 
             // FreeRDP failed — record error for diagnostics
             LastError = freeRdp.LastError;
+            Logger.Warn($"FreeRDP failed (exit code {exitCode}). LastError: {LastError}");
 
             if (!fallbackToMstsc)
+            {
+                Logger.Info("Fallback to mstsc is disabled. Returning failure.");
                 return exitCode;
+            }
+
+            Logger.Info("Falling back to mstsc.exe...");
         }
         else
         {
             LastError = "FreeRDP not found.";
+            Logger.Warn(LastError);
             if (!fallbackToMstsc)
+            {
+                Logger.Info("Fallback to mstsc is disabled. Returning failure.");
                 return -1;
+            }
+            Logger.Info("Falling back to mstsc.exe...");
         }
 
         // --- Fallback to mstsc.exe ---
@@ -51,6 +69,8 @@ public static class ProcessLauncher
     private static async Task<int> LaunchMstscFallbackAsync(
         ConnectionInfo connection, string username, string cacheDir)
     {
+        Logger.Info("LaunchMstscFallbackAsync started");
+
         // Ensure cert is trusted for mstsc path
         if (!string.IsNullOrEmpty(connection.CertThumbprint) &&
             !CertificateManager.IsCertificateTrusted(connection.CertThumbprint))
@@ -73,9 +93,11 @@ public static class ProcessLauncher
         if (rdpPath == null)
         {
             LastError = $"mstsc fallback: {rdpManager.LastError ?? "Unable to get .rdp file."}";
+            Logger.Error(LastError);
             return -1;
         }
 
+        Logger.Debug($"  RDP file path: {rdpPath}");
         var tempRdpPath = RdpFileManager.PrepareForLaunch(rdpPath);
         if (tempRdpPath == null)
         {
@@ -92,15 +114,19 @@ public static class ProcessLauncher
                 UseShellExecute = false
             };
 
+            Logger.Info($"Starting mstsc.exe with: {tempRdpPath}");
             var process = Process.Start(startInfo);
             if (process == null)
             {
                 LastError = "mstsc fallback: Failed to start mstsc.exe.";
+                Logger.Error(LastError);
                 return -1;
             }
 
+            Logger.Debug($"  mstsc.exe PID: {process.Id}");
             await process.WaitForExitAsync();
             var exitCode = process.ExitCode;
+            Logger.Info($"  mstsc.exe exited with code: {exitCode}");
             process.Dispose();
 
             RdpFileManager.CleanupTempFile(tempRdpPath);

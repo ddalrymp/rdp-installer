@@ -5,26 +5,24 @@ using System.Text;
 namespace RdpLauncher;
 
 /// <summary>
-/// Manages user credentials (OrgId, UserId, encrypted password) using the
+/// Manages user credentials (Organization, Username, encrypted Password) using the
 /// Windows registry and DPAPI for password protection.
+/// All three fields can be independently saved and loaded.
 /// </summary>
 public sealed class CredentialManager
 {
     private const string RegistrySubKey = @"Software\RdpLauncher";
 
-    public string OrgId { get; private set; } = "";
-    public string UserId { get; private set; } = "";
-    public string Username => string.IsNullOrEmpty(OrgId) || string.IsNullOrEmpty(UserId)
-        ? ""
-        : $"{OrgId}_{UserId}";
+    public string Organization { get; private set; } = "";
+    public string Username { get; private set; } = "";
 
-    public bool HasCredentials => !string.IsNullOrEmpty(OrgId) && !string.IsNullOrEmpty(UserId);
+    public bool HasIdentity => !string.IsNullOrEmpty(Organization) && !string.IsNullOrEmpty(Username);
     public bool HasPassword => _password != null;
 
     private string? _password;
 
     /// <summary>
-    /// Loads OrgId, UserId, and encrypted password from the registry.
+    /// Loads Organization, Username, and encrypted password from the registry.
     /// </summary>
     public void Load()
     {
@@ -33,38 +31,41 @@ public sealed class CredentialManager
             using var key = Registry.CurrentUser.OpenSubKey(RegistrySubKey);
             if (key == null) return;
 
-            OrgId = key.GetValue("OrgId") as string ?? "";
-            UserId = key.GetValue("UserId") as string ?? "";
+            Organization = key.GetValue("Organization") as string ?? "";
+            Username = key.GetValue("Username") as string ?? "";
 
             var encryptedBase64 = key.GetValue("EncryptedPassword") as string;
             if (!string.IsNullOrEmpty(encryptedBase64))
             {
                 _password = DecryptPassword(encryptedBase64);
             }
+
+            Logger.Debug($"Credentials loaded. Organization: {Organization}, Username: {Username}, HasPassword: {HasPassword}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Registry not available — leave defaults
+            Logger.Error("Failed to load credentials from registry", ex);
         }
     }
 
     /// <summary>
-    /// Saves OrgId and UserId to the registry. Does NOT save password here.
+    /// Saves Organization and Username to the registry.
     /// </summary>
-    public void SaveIdentity(string orgId, string userId)
+    public void SaveIdentity(string organization, string username)
     {
-        OrgId = orgId.Trim().ToUpperInvariant();
-        UserId = userId.Trim().ToUpperInvariant();
+        Organization = organization.Trim();
+        Username = username.Trim();
 
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(RegistrySubKey);
-            key.SetValue("OrgId", OrgId);
-            key.SetValue("UserId", UserId);
+            key.SetValue("Organization", Organization);
+            key.SetValue("Username", Username);
+            Logger.Debug($"Identity saved. Organization: {Organization}, Username: {Username}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal
+            Logger.Error("Failed to save identity to registry", ex);
         }
     }
 
@@ -86,7 +87,7 @@ public sealed class CredentialManager
 
     /// <summary>
     /// Persists the password to the registry using DPAPI encryption.
-    /// Only call this after a successful connection.
+    /// Call after a successful connection or when the user explicitly saves.
     /// </summary>
     public void SavePassword()
     {
@@ -97,10 +98,11 @@ public sealed class CredentialManager
             var encrypted = EncryptPassword(_password);
             using var key = Registry.CurrentUser.CreateSubKey(RegistrySubKey);
             key.SetValue("EncryptedPassword", encrypted);
+            Logger.Debug("Password saved to registry (DPAPI-encrypted).");
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal: user will need to re-enter next time
+            Logger.Error("Failed to save password to registry", ex);
         }
     }
 
@@ -127,8 +129,8 @@ public sealed class CredentialManager
     /// </summary>
     public void ClearAll()
     {
-        OrgId = "";
-        UserId = "";
+        Organization = "";
+        Username = "";
         _password = null;
 
         try

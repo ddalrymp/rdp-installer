@@ -17,6 +17,8 @@ public sealed class FreeRdpLauncher
     {
         _wfreerdpPath = wfreerdpPath
             ?? Path.Combine(AppContext.BaseDirectory, "freerdp", "wfreerdp.exe");
+        Logger.Debug($"FreeRdpLauncher initialized. Path: {_wfreerdpPath}");
+        Logger.Debug($"  Exists: {File.Exists(_wfreerdpPath)}");
     }
 
     /// <summary>
@@ -31,14 +33,20 @@ public sealed class FreeRdpLauncher
     public async Task<int> LaunchAsync(ConnectionInfo connection, string username, string password)
     {
         LastError = null;
+        Logger.Info($"FreeRDP LaunchAsync called for server: {connection.ServerAddress}:{connection.Port}");
+        Logger.Debug($"  RemoteApp: {connection.RemoteAppProgram}");
+        Logger.Debug($"  Domain: {connection.Domain}");
+        Logger.Debug($"  Username: {username}");
 
         if (!IsAvailable)
         {
             LastError = $"FreeRDP not found at: {_wfreerdpPath}";
+            Logger.Error(LastError);
             return -1;
         }
 
         var args = BuildArguments(connection, username);
+        Logger.Debug($"  Command: {_wfreerdpPath} {args}");
 
         try
         {
@@ -52,27 +60,42 @@ public sealed class FreeRdpLauncher
                 CreateNoWindow = true
             };
 
+            Logger.Info("Starting wfreerdp.exe process...");
             var process = Process.Start(startInfo);
             if (process == null)
             {
                 LastError = "Failed to start wfreerdp.exe process.";
+                Logger.Error(LastError);
                 return -1;
             }
+
+            Logger.Debug($"  Process started, PID: {process.Id}");
 
             // Pass password via stdin to avoid command-line exposure
             await process.StandardInput.WriteLineAsync(password);
             process.StandardInput.Close();
+            Logger.Debug("  Password sent via stdin, waiting for exit...");
 
+            // Read stderr before WaitForExit to avoid deadlocks
+            var stderrTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             var exitCode = process.ExitCode;
+            var stderr = await stderrTask;
+
+            Logger.Info($"  wfreerdp.exe exited with code: {exitCode}");
+
+            if (!string.IsNullOrWhiteSpace(stderr))
+            {
+                Logger.Debug($"  stderr output:\n{stderr.Trim()}");
+            }
 
             if (exitCode != 0)
             {
-                var stderr = await process.StandardError.ReadToEndAsync();
                 if (!string.IsNullOrWhiteSpace(stderr))
                     LastError = $"FreeRDP exited with code {exitCode}: {stderr.Trim()}";
                 else
                     LastError = $"FreeRDP exited with code {exitCode}";
+                Logger.Error(LastError);
             }
 
             process.Dispose();
@@ -81,6 +104,7 @@ public sealed class FreeRdpLauncher
         catch (Exception ex)
         {
             LastError = $"Failed to launch FreeRDP: {ex.Message}";
+            Logger.Error("FreeRDP launch exception", ex);
             return -1;
         }
     }

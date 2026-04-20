@@ -62,8 +62,6 @@ Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "Config
 ; Store the install path for reference
 Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 
-; OrgId and UserId are written by the [Code] section after the input page
-
 [Run]
 ; Import the signing certificate into TrustedPublisher after installation (for mstsc fallback)
 Filename: "powershell.exe"; \
@@ -87,74 +85,12 @@ Filename: "powershell.exe"; \
 Type: filesandordirs; Name: "{localappdata}\{#MyAppId}\cache"
 
 [Code]
-var
-  IdentityPage: TInputQueryWizardPage;
-
-function GetOrgId(): String;
-var
-  CmdLineVal: String;
-begin
-  CmdLineVal := ExpandConstant('{param:ORGID|}');
-  if CmdLineVal <> '' then
-    Result := Trim(CmdLineVal)
-  else if Assigned(IdentityPage) then
-    Result := Trim(IdentityPage.Values[0])
-  else
-    Result := '';
-end;
-
-function GetUserId(): String;
-var
-  CmdLineVal: String;
-begin
-  CmdLineVal := ExpandConstant('{param:USERID|}');
-  if CmdLineVal <> '' then
-    Result := Trim(CmdLineVal)
-  else if Assigned(IdentityPage) then
-    Result := Trim(IdentityPage.Values[1])
-  else
-    Result := '';
-end;
-
-procedure InitializeWizard();
-begin
-  // Only show the input page if neither /ORGID nor /USERID were provided
-  if (ExpandConstant('{param:ORGID|}') = '') or (ExpandConstant('{param:USERID|}') = '') then
-  begin
-    IdentityPage := CreateInputQueryPage(wpSelectDir,
-      'Organization & User',
-      'Enter your organization and user identifiers.',
-      'These identify your connection settings (e.g., ORG1 and U01).');
-    IdentityPage.Add('Organization ID:', False);
-    IdentityPage.Add('User ID:', False);
-  end;
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if Assigned(IdentityPage) and (CurPageID = IdentityPage.ID) then
-  begin
-    if (Trim(IdentityPage.Values[0]) = '') or (Trim(IdentityPage.Values[1]) = '') then
-    begin
-      MsgBox('Please enter both Organization ID and User ID.', mbError, MB_OK);
-      Result := False;
-    end;
-  end;
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ErrorCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
-    // Write identity to the registry
-    RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
-      'OrgId', GetOrgId());
-    RegWriteStringValue(HKEY_CURRENT_USER, 'Software\{#MyAppId}',
-      'UserId', GetUserId());
-
     // Suppress the one-time RDP educational warning dialog (for mstsc fallback)
     RegWriteDWordValue(HKEY_CURRENT_USER,
       'Software\Microsoft\Terminal Server Client',

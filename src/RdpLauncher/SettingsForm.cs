@@ -1,17 +1,19 @@
 namespace RdpLauncher;
 
 /// <summary>
-/// Settings form: allows users to change OrgId, UserId, password, and test the connection.
+/// Settings form: allows users to change Organization, Username, Password.
 /// Accessed via a gear icon on the main form.
 /// </summary>
 public sealed class SettingsForm : Form
 {
-    private readonly TextBox _orgIdBox;
-    private readonly TextBox _userIdBox;
+    private readonly TextBox _orgBox;
+    private readonly TextBox _usernameBox;
     private readonly TextBox _passwordBox;
+    private readonly CheckBox _saveAllCheckBox;
     private readonly Button _saveButton;
     private readonly Button _cancelButton;
     private readonly Button _clearPasswordButton;
+    private readonly LinkLabel _logLink;
     private readonly Label _statusLabel;
 
     private readonly CredentialManager _credentials;
@@ -23,7 +25,7 @@ public sealed class SettingsForm : Form
         _credentials = credentials;
 
         Text = "Settings";
-        Size = new System.Drawing.Size(380, 300);
+        Size = new System.Drawing.Size(380, 340);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -31,45 +33,43 @@ public sealed class SettingsForm : Form
 
         var orgLabel = new Label
         {
-            Text = "Organization ID:",
+            Text = "Organization:",
             Location = new System.Drawing.Point(15, 15),
             Size = new System.Drawing.Size(120, 20),
             Font = new System.Drawing.Font("Segoe UI", 9f)
         };
         Controls.Add(orgLabel);
 
-        _orgIdBox = new TextBox
+        _orgBox = new TextBox
         {
-            Text = credentials.OrgId,
+            Text = credentials.Organization,
             Location = new System.Drawing.Point(15, 37),
             Size = new System.Drawing.Size(335, 25),
-            Font = new System.Drawing.Font("Segoe UI", 10f),
-            CharacterCasing = CharacterCasing.Upper
+            Font = new System.Drawing.Font("Segoe UI", 10f)
         };
-        Controls.Add(_orgIdBox);
+        Controls.Add(_orgBox);
 
         var userLabel = new Label
         {
-            Text = "User ID:",
+            Text = "Username:",
             Location = new System.Drawing.Point(15, 70),
             Size = new System.Drawing.Size(120, 20),
             Font = new System.Drawing.Font("Segoe UI", 9f)
         };
         Controls.Add(userLabel);
 
-        _userIdBox = new TextBox
+        _usernameBox = new TextBox
         {
-            Text = credentials.UserId,
+            Text = credentials.Username,
             Location = new System.Drawing.Point(15, 92),
             Size = new System.Drawing.Size(335, 25),
-            Font = new System.Drawing.Font("Segoe UI", 10f),
-            CharacterCasing = CharacterCasing.Upper
+            Font = new System.Drawing.Font("Segoe UI", 10f)
         };
-        Controls.Add(_userIdBox);
+        Controls.Add(_usernameBox);
 
         var passwordLabel = new Label
         {
-            Text = "New Password (leave blank to keep current):",
+            Text = "Password:",
             Location = new System.Drawing.Point(15, 125),
             Size = new System.Drawing.Size(335, 20),
             Font = new System.Drawing.Font("Segoe UI", 9f)
@@ -83,12 +83,24 @@ public sealed class SettingsForm : Form
             Font = new System.Drawing.Font("Segoe UI", 10f),
             UseSystemPasswordChar = true
         };
+        if (credentials.HasPassword)
+            _passwordBox.PlaceholderText = "(saved - leave blank to keep)";
         Controls.Add(_passwordBox);
+
+        _saveAllCheckBox = new CheckBox
+        {
+            Text = "Save all credentials",
+            Location = new System.Drawing.Point(15, 182),
+            Size = new System.Drawing.Size(200, 20),
+            Font = new System.Drawing.Font("Segoe UI", 9f),
+            Checked = true
+        };
+        Controls.Add(_saveAllCheckBox);
 
         _clearPasswordButton = new Button
         {
             Text = "Clear Saved Password",
-            Location = new System.Drawing.Point(15, 185),
+            Location = new System.Drawing.Point(15, 210),
             Size = new System.Drawing.Size(150, 28),
             Font = new System.Drawing.Font("Segoe UI", 8.5f)
         };
@@ -98,17 +110,38 @@ public sealed class SettingsForm : Form
         _statusLabel = new Label
         {
             Text = "",
-            Location = new System.Drawing.Point(175, 190),
+            Location = new System.Drawing.Point(175, 215),
             Size = new System.Drawing.Size(175, 20),
             Font = new System.Drawing.Font("Segoe UI", 8.5f),
             ForeColor = System.Drawing.Color.Green
         };
         Controls.Add(_statusLabel);
 
+        _logLink = new LinkLabel
+        {
+            Text = "Open debug log",
+            Location = new System.Drawing.Point(15, 245),
+            Size = new System.Drawing.Size(200, 20),
+            Font = new System.Drawing.Font("Segoe UI", 8.5f)
+        };
+        _logLink.LinkClicked += (_, _) =>
+        {
+            try
+            {
+                var logPath = Logger.LogFilePath;
+                if (File.Exists(logPath))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(logPath) { UseShellExecute = true });
+                else
+                    MessageBox.Show($"Log file not found:\n{logPath}", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch { }
+        };
+        Controls.Add(_logLink);
+
         _saveButton = new Button
         {
             Text = "Save",
-            Location = new System.Drawing.Point(165, 225),
+            Location = new System.Drawing.Point(165, 268),
             Size = new System.Drawing.Size(85, 30),
             DialogResult = DialogResult.OK
         };
@@ -118,7 +151,7 @@ public sealed class SettingsForm : Form
         _cancelButton = new Button
         {
             Text = "Cancel",
-            Location = new System.Drawing.Point(260, 225),
+            Location = new System.Drawing.Point(260, 268),
             Size = new System.Drawing.Size(85, 30),
             DialogResult = DialogResult.Cancel
         };
@@ -130,26 +163,27 @@ public sealed class SettingsForm : Form
 
     private void OnSave(object? sender, EventArgs e)
     {
-        var orgId = _orgIdBox.Text.Trim();
-        var userId = _userIdBox.Text.Trim();
+        var org = _orgBox.Text.Trim();
+        var username = _usernameBox.Text.Trim();
 
-        if (string.IsNullOrEmpty(orgId) || string.IsNullOrEmpty(userId))
+        if (string.IsNullOrEmpty(org) || string.IsNullOrEmpty(username))
         {
-            MessageBox.Show("Organization ID and User ID are required.", Text,
+            MessageBox.Show("Organization and Username are required.", Text,
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             DialogResult = DialogResult.None;
             return;
         }
 
-        var identityChanged = !string.Equals(orgId, _credentials.OrgId, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(userId, _credentials.UserId, StringComparison.OrdinalIgnoreCase);
+        var identityChanged = !string.Equals(org, _credentials.Organization, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(username, _credentials.Username, StringComparison.OrdinalIgnoreCase);
 
-        _credentials.SaveIdentity(orgId, userId);
+        _credentials.SaveIdentity(org, username);
 
         if (!string.IsNullOrEmpty(_passwordBox.Text))
         {
             _credentials.SetPassword(_passwordBox.Text);
-            _credentials.SavePassword();
+            if (_saveAllCheckBox.Checked)
+                _credentials.SavePassword();
             CredentialsChanged = true;
         }
         else if (identityChanged)
@@ -167,6 +201,7 @@ public sealed class SettingsForm : Form
     {
         _credentials.ClearPassword();
         _statusLabel.Text = "Password cleared.";
+        _passwordBox.PlaceholderText = "";
         CredentialsChanged = true;
     }
 }
