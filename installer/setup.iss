@@ -6,7 +6,7 @@
 ; Before building:
 ; 1. Publish the .NET app: dotnet publish src/RdpLauncher -c Release
 ; 2. Place the published output in installer/publish/
-; 3. Place FreeRDP files in installer/freerdp/ (sdl-freerdp3.exe + DLLs)
+; 3. Place FreeRDP files in installer/freerdp/ (sdl3-freerdp.exe + DLLs)
 ; 4. Place your signing-cert.cer in installer/
 ; 5. (Optional) Place icon.ico in installer/assets/
 ; ============================================================

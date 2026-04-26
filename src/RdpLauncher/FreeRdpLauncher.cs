@@ -5,7 +5,7 @@ using System.Text;
 namespace RdpLauncher;
 
 /// <summary>
-/// Launches sdl-freerdp3.exe with RAIL (RemoteApp) support.
+/// Launches sdl3-freerdp.exe with RAIL (RemoteApp) support.
 /// Passes credentials via stdin to avoid exposure in process command line.
 /// </summary>
 public sealed class FreeRdpLauncher
@@ -17,13 +17,13 @@ public sealed class FreeRdpLauncher
     public FreeRdpLauncher(string? freerdpPath = null)
     {
         _freerdpPath = freerdpPath
-            ?? Path.Combine(AppContext.BaseDirectory, "freerdp", "sdl-freerdp3.exe");
+            ?? Path.Combine(AppContext.BaseDirectory, "freerdp", "sdl3-freerdp.exe");
         Logger.Debug($"FreeRdpLauncher initialized. Path: {_freerdpPath}");
         Logger.Debug($"  Exists: {File.Exists(_freerdpPath)}");
     }
 
     /// <summary>
-    /// Returns true if the sdl-freerdp3.exe binary is present.
+    /// Returns true if the sdl3-freerdp.exe binary is present.
     /// </summary>
     public bool IsAvailable => File.Exists(_freerdpPath);
 
@@ -66,11 +66,11 @@ public sealed class FreeRdpLauncher
                 CreateNoWindow = true
             };
 
-            Logger.Info("Starting sdl-freerdp3.exe process...");
+            Logger.Info("Starting sdl3-freerdp.exe process...");
             var process = Process.Start(startInfo);
             if (process == null)
             {
-                LastError = "Failed to start sdl-freerdp3.exe process.";
+                LastError = "Failed to start sdl3-freerdp.exe process.";
                 Logger.Error(LastError);
                 return -1;
             }
@@ -88,7 +88,7 @@ public sealed class FreeRdpLauncher
             var exitCode = process.ExitCode;
             var stderr = await stderrTask;
 
-            Logger.Info($"  sdl-freerdp3.exe exited with code: {exitCode}");
+            Logger.Info($"  sdl3-freerdp.exe exited with code: {exitCode}");
 
             if (!string.IsNullOrWhiteSpace(stderr))
             {
@@ -116,7 +116,7 @@ public sealed class FreeRdpLauncher
     }
 
     /// <summary>
-    /// Builds the sdl-freerdp3 command-line arguments for a RemoteApp (RAIL) connection.
+    /// Builds the sdl3-freerdp command-line arguments for a RemoteApp (RAIL) connection.
     /// Password is NOT included — it's passed via stdin using /from-stdin.
     /// </summary>
     internal static string BuildArguments(ConnectionInfo connection, string username)
@@ -164,7 +164,7 @@ public sealed class FreeRdpLauncher
 
     /// <summary>
     /// Removes the Zone.Identifier alternate data stream (Mark of the Web) from
-    /// sdl-freerdp3.exe and all files in its directory. Files downloaded from the
+    /// sdl3-freerdp.exe and all files in its directory. Files downloaded from the
     /// internet carry this stream, which causes SmartScreen to block them when
     /// launched programmatically with no UI for the trust prompt.
     /// Uses DeleteFile on the ":Zone.Identifier" ADS — this is the same thing
