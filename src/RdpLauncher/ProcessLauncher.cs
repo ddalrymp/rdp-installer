@@ -21,14 +21,14 @@ public static class ProcessLauncher
         Logger.Info("ProcessLauncher.LaunchAsync started");
         Logger.Debug($"  Connection: {connection.ServerAddress}:{connection.Port}");
 
-        return await LaunchMstscAsync(connection, username, cacheDir);
+        return await LaunchMstscAsync(connection, username, password, cacheDir);
     }
 
     /// <summary>
     /// Launches mstsc.exe using a downloaded .rdp file.
     /// </summary>
     private static async Task<int> LaunchMstscAsync(
-        ConnectionInfo connection, string username, string cacheDir)
+        ConnectionInfo connection, string username, string password, string cacheDir)
     {
         Logger.Info("LaunchMstscAsync started");
 
@@ -66,6 +66,18 @@ public static class ProcessLauncher
             return -1;
         }
 
+        // Store credential via cmdkey so mstsc auto-authenticates
+        var credTarget = $"TERMSRV/{connection.ServerAddress}";
+        try
+        {
+            StoreCmdKeyCredential(credTarget, username, password);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"cmdkey store failed: {ex.Message}");
+            // Continue anyway — user will get a password prompt from mstsc
+        }
+
         try
         {
             var startInfo = new ProcessStartInfo
@@ -97,6 +109,54 @@ public static class ProcessLauncher
         {
             LastError = $"mstsc: {ex.Message}";
             return -1;
+        }
+        finally
+        {
+            // Always clean up the stored credential
+            DeleteCmdKeyCredential(credTarget);
+        }
+    }
+
+    private static void StoreCmdKeyCredential(string target, string username, string password)
+    {
+        Logger.Debug($"Storing credential for {target}");
+        var psi = new ProcessStartInfo
+        {
+            FileName = "cmdkey.exe",
+            Arguments = $"/generic:{target} /user:{username} /pass:{password}",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        using var proc = Process.Start(psi);
+        proc?.WaitForExit(5000);
+        if (proc?.ExitCode != 0)
+            Logger.Warn($"cmdkey store returned exit code {proc?.ExitCode}");
+        else
+            Logger.Debug("Credential stored successfully");
+    }
+
+    private static void DeleteCmdKeyCredential(string target)
+    {
+        try
+        {
+            Logger.Debug($"Removing credential for {target}");
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmdkey.exe",
+                Arguments = $"/delete:{target}",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(5000);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"cmdkey delete failed: {ex.Message}");
         }
     }
 }

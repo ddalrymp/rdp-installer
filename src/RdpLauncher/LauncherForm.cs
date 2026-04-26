@@ -171,7 +171,7 @@ public sealed class LauncherForm : Form
                 }
             }
 
-            // Step 4: Launch via FreeRDP (primary) or mstsc (fallback)
+            // Step 4: Launch mstsc.exe with stored credential
             UpdateStatus($"Launching {connection.DisplayName}...");
             Logger.Info($"Launching connection: {connection.DisplayName}");
             Hide();
