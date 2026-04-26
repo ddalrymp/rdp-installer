@@ -65,7 +65,7 @@ try {
     $null = Get-Content -Raw $ConfigPath | ConvertFrom-Json
 }
 catch {
-    Write-Error "Invalid JSON in $ConfigPath — $($_.Exception.Message)"
+    Write-Error "Invalid JSON in $ConfigPath $($_.Exception.Message)"
     exit 1
 }
 
