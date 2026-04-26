@@ -5,27 +5,27 @@ using System.Text;
 namespace RdpLauncher;
 
 /// <summary>
-/// Launches wfreerdp.exe with RAIL (RemoteApp) support.
+/// Launches sdl-freerdp3.exe with RAIL (RemoteApp) support.
 /// Passes credentials via stdin to avoid exposure in process command line.
 /// </summary>
 public sealed class FreeRdpLauncher
 {
-    private readonly string _wfreerdpPath;
+    private readonly string _freerdpPath;
 
     public string? LastError { get; private set; }
 
-    public FreeRdpLauncher(string? wfreerdpPath = null)
+    public FreeRdpLauncher(string? freerdpPath = null)
     {
-        _wfreerdpPath = wfreerdpPath
-            ?? Path.Combine(AppContext.BaseDirectory, "freerdp", "wfreerdp.exe");
-        Logger.Debug($"FreeRdpLauncher initialized. Path: {_wfreerdpPath}");
-        Logger.Debug($"  Exists: {File.Exists(_wfreerdpPath)}");
+        _freerdpPath = freerdpPath
+            ?? Path.Combine(AppContext.BaseDirectory, "freerdp", "sdl-freerdp3.exe");
+        Logger.Debug($"FreeRdpLauncher initialized. Path: {_freerdpPath}");
+        Logger.Debug($"  Exists: {File.Exists(_freerdpPath)}");
     }
 
     /// <summary>
-    /// Returns true if the wfreerdp.exe binary is present.
+    /// Returns true if the sdl-freerdp3.exe binary is present.
     /// </summary>
-    public bool IsAvailable => File.Exists(_wfreerdpPath);
+    public bool IsAvailable => File.Exists(_freerdpPath);
 
     /// <summary>
     /// Launches a FreeRDP RemoteApp session.
@@ -41,7 +41,7 @@ public sealed class FreeRdpLauncher
 
         if (!IsAvailable)
         {
-            LastError = $"FreeRDP not found at: {_wfreerdpPath}";
+            LastError = $"FreeRDP not found at: {_freerdpPath}";
             Logger.Error(LastError);
             return -1;
         }
@@ -52,13 +52,13 @@ public sealed class FreeRdpLauncher
         UnblockFreeRdpFiles();
 
         var args = BuildArguments(connection, username);
-        Logger.Debug($"  Command: {_wfreerdpPath} {args}");
+        Logger.Debug($"  Command: {_freerdpPath} {args}");
 
         try
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = _wfreerdpPath,
+                FileName = _freerdpPath,
                 Arguments = args,
                 UseShellExecute = false,
                 RedirectStandardInput = true,
@@ -66,11 +66,11 @@ public sealed class FreeRdpLauncher
                 CreateNoWindow = true
             };
 
-            Logger.Info("Starting wfreerdp.exe process...");
+            Logger.Info("Starting sdl-freerdp3.exe process...");
             var process = Process.Start(startInfo);
             if (process == null)
             {
-                LastError = "Failed to start wfreerdp.exe process.";
+                LastError = "Failed to start sdl-freerdp3.exe process.";
                 Logger.Error(LastError);
                 return -1;
             }
@@ -88,7 +88,7 @@ public sealed class FreeRdpLauncher
             var exitCode = process.ExitCode;
             var stderr = await stderrTask;
 
-            Logger.Info($"  wfreerdp.exe exited with code: {exitCode}");
+            Logger.Info($"  sdl-freerdp3.exe exited with code: {exitCode}");
 
             if (!string.IsNullOrWhiteSpace(stderr))
             {
@@ -116,7 +116,7 @@ public sealed class FreeRdpLauncher
     }
 
     /// <summary>
-    /// Builds the wfreerdp command-line arguments for a RemoteApp (RAIL) connection.
+    /// Builds the sdl-freerdp3 command-line arguments for a RemoteApp (RAIL) connection.
     /// Password is NOT included — it's passed via stdin using /from-stdin.
     /// </summary>
     internal static string BuildArguments(ConnectionInfo connection, string username)
@@ -134,16 +134,18 @@ public sealed class FreeRdpLauncher
             sb.Append($" /d:{connection.Domain}");
         sb.Append(" /from-stdin");
 
-        // RemoteApp (RAIL)
+        // RemoteApp (RAIL) — FreeRDP 3.x uses /app:program:,name:,cmd: sub-options
         if (!string.IsNullOrEmpty(connection.RemoteAppProgram))
         {
-            sb.Append($" /app:\"{connection.RemoteAppProgram}\"");
+            var appParts = new List<string> { $"program:{connection.RemoteAppProgram}" };
 
             if (!string.IsNullOrEmpty(connection.RemoteAppName))
-                sb.Append($" /app-name:\"{connection.RemoteAppName}\"");
+                appParts.Add($"name:{connection.RemoteAppName}");
 
             if (!string.IsNullOrEmpty(connection.RemoteAppCmdLine))
-                sb.Append($" /app-cmd:\"{connection.RemoteAppCmdLine}\"");
+                appParts.Add($"cmd:{connection.RemoteAppCmdLine}");
+
+            sb.Append($" /app:{string.Join(",", appParts)}");
         }
 
         // Resource sharing
@@ -162,7 +164,7 @@ public sealed class FreeRdpLauncher
 
     /// <summary>
     /// Removes the Zone.Identifier alternate data stream (Mark of the Web) from
-    /// wfreerdp.exe and all files in its directory. Files downloaded from the
+    /// sdl-freerdp3.exe and all files in its directory. Files downloaded from the
     /// internet carry this stream, which causes SmartScreen to block them when
     /// launched programmatically with no UI for the trust prompt.
     /// Uses DeleteFile on the ":Zone.Identifier" ADS — this is the same thing
@@ -172,7 +174,7 @@ public sealed class FreeRdpLauncher
     {
         try
         {
-            var dir = Path.GetDirectoryName(_wfreerdpPath);
+            var dir = Path.GetDirectoryName(_freerdpPath);
             if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
 
             var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);

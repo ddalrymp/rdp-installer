@@ -12,7 +12,7 @@ A lightweight Windows launcher that gives clients a **one-click, no-prompts** co
 │  users/ORG1_U01.rdp      │         │   ├─ Load OrgId/UserId   │
 │  users/ORG1_U02.rdp      │         │   ├─ Fetch config.json   │
 │  users/...               │         │   ├─ Resolve templates   │
-│  signing-cert.cer        │         │   ├─ Launch wfreerdp.exe │
+│  signing-cert.cer        │         │   ├─ Launch sdl-freerdp3 │
 │  RdpLauncherSetup.exe    │         │   └─ (mstsc fallback)    │
 └──────────────────────────┘         └──────────────────────────┘
 ```
@@ -129,7 +129,7 @@ RdpLauncherSetup.exe /SILENT /ORGID=ORG1 /USERID=U01
 2. Prompts for password if not saved (DPAPI-encrypted in registry)
 3. Fetches `config.json` from the hosted endpoint (cached with TTL)
 4. Resolves `{ORGID}` and `{USERID}` placeholders in config values
-5. Launches `wfreerdp.exe` with RAIL mode for true floating RemoteApp windows
+5. Launches `sdl-freerdp3.exe` with RAIL mode for true floating RemoteApp windows
 6. Passes credentials via stdin (not visible in process list)
 7. On success: saves password for next time
 8. On FreeRDP failure (if `fallbackToMstsc` enabled): falls back to mstsc.exe with .rdp file
@@ -171,7 +171,7 @@ rdp-installer/
 │   │   ├── CredentialManager.cs  # DPAPI password storage, registry identity
 │   │   ├── CredentialPrompt.cs   # Password input dialog
 │   │   ├── SettingsForm.cs       # Settings UI (org/user/password)
-│   │   ├── FreeRdpLauncher.cs    # wfreerdp.exe RAIL launcher
+│   │   ├── FreeRdpLauncher.cs    # sdl-freerdp3.exe RAIL launcher
 │   │   ├── ProcessLauncher.cs    # FreeRDP → mstsc fallback orchestrator
 │   │   ├── RdpFileManager.cs     # Download & cache .rdp files (fallback)
 │   │   ├── CertificateManager.cs # Import certs to TrustedPublisher
@@ -180,7 +180,7 @@ rdp-installer/
 │   └── RdpLauncher.Tests/        # xUnit unit tests
 ├── installer/
 │   ├── setup.iss                 # Inno Setup script (OrgId + UserId pages)
-│   ├── freerdp/                  # Bundled wfreerdp.exe + DLLs (pinned version)
+│   ├── freerdp/                  # Bundled sdl-freerdp3.exe + DLLs (pinned version)
 │   ├── Prepare-Installer.ps1    # Download signing-cert.cer from S3
 │   ├── Deploy-Installer.ps1     # Upload compiled installer to S3
 │   └── assets/                   # Icon and installer resources

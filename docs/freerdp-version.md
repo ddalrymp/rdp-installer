@@ -10,18 +10,18 @@
 
 Place the following in `installer/freerdp/`:
 
-- `wfreerdp.exe` — The Windows FreeRDP client with RAIL support
+- `sdl-freerdp3.exe` — The SDL3-based Windows FreeRDP client with RAIL support
 - All required DLLs (shipped alongside the .exe in the release zip)
 
 ## How to Update
 
 1. Go to https://github.com/FreeRDP/FreeRDP/releases
 2. Download the latest stable Windows x64 release (`.zip`)
-3. Extract `wfreerdp.exe` and all `.dll` files
+3. Extract `sdl-freerdp3.exe` and all `.dll` files
 4. Replace contents of `installer/freerdp/` with the new files
 5. Test a RemoteApp connection:
    ```
-   wfreerdp.exe /v:your-server /u:testuser /from-stdin /app:"||YourApp" /cert:tofu
+   sdl-freerdp3.exe /v:your-server /u:testuser /from-stdin /app:program:||YourApp /cert:tofu
    ```
 6. Update the version number at the top of this file
 7. Rebuild the installer
@@ -38,7 +38,7 @@ Place the following in `installer/freerdp/`:
 
 ## Architecture Notes
 
-- The launcher expects FreeRDP at `{app}\freerdp\wfreerdp.exe`
+- The launcher expects FreeRDP at `{app}\freerdp\sdl-freerdp3.exe`
 - Credentials are passed via `/from-stdin` — password is written to stdin
 - RAIL (Remote Applications Integrated Locally) provides true multi-window RemoteApp
 - `/cert:tofu` = Trust On First Use — user sees prompt once, then cert is cached
@@ -48,6 +48,6 @@ Place the following in `installer/freerdp/`:
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | "FreeRDP not found" | Missing from install dir | Re-run installer or manually copy files |
-| App doesn't float | Missing RAIL support | Ensure you're using `wfreerdp.exe` not `xfreerdp` |
+| App doesn't float | Missing RAIL support | Ensure you're using `sdl-freerdp3.exe` (not the deprecated `wfreerdp.exe` or `xfreerdp`) |
 | Auth failure | Wrong credentials | Use Settings gear to re-enter password |
 | Exit code 131 | Network/TLS error | Check server address, try `/cert:ignore` for testing |
