@@ -102,6 +102,10 @@ public static class ProcessLauncher
             Logger.Info($"  mstsc.exe exited with code: {exitCode}");
             process.Dispose();
 
+            // mstsc.exe exits quickly after spawning the actual RDP client.
+            // Wait for the child mstsc process to finish before cleaning up credentials.
+            await WaitForMstscSessionAsync();
+
             RdpFileManager.CleanupTempFile(tempRdpPath);
             return exitCode;
         }
@@ -114,6 +118,29 @@ public static class ProcessLauncher
         {
             // Always clean up the stored credential
             DeleteCmdKeyCredential(credTarget);
+        }
+    }
+
+    /// <summary>
+    /// Waits for all mstsc.exe processes to exit. The initial mstsc.exe spawns a
+    /// child process for the actual RDP session, so we poll until no mstsc processes remain.
+    /// </summary>
+    private static async Task WaitForMstscSessionAsync()
+    {
+        // Brief delay to let the child process spin up
+        await Task.Delay(2000);
+
+        while (true)
+        {
+            var mstscProcs = Process.GetProcessesByName("mstsc");
+            if (mstscProcs.Length == 0)
+            {
+                Logger.Info("No mstsc.exe processes remaining — session ended");
+                break;
+            }
+
+            foreach (var p in mstscProcs) p.Dispose();
+            await Task.Delay(1000);
         }
     }
 
