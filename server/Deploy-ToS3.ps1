@@ -1,10 +1,11 @@
 <#
 .SYNOPSIS
-    Uploads signed RDP files, config, and certificate to an S3 bucket.
+    Uploads signed RDP files and certificate to an S3 bucket.
 
 .DESCRIPTION
-    Uploads the users/ directory of signed .rdp files, the signing certificate,
-    and config.json to the specified S3 bucket path using the AWS CLI.
+    Uploads the users/ directory of signed .rdp files and the signing certificate
+    to the specified S3 bucket path using the AWS CLI. Use Deploy-Config.ps1
+    separately to upload config.json.
 
 .PARAMETER BucketName
     The S3 bucket name (e.g., "my-rdp-hosting-bucket").
@@ -46,14 +47,11 @@ catch {
     exit 1
 }
 
-# Verify output files exist
-$requiredFiles = @("signing-cert.cer", "config.json")
-foreach ($file in $requiredFiles) {
-    $path = Join-Path $OutputDir $file
-    if (-not (Test-Path $path)) {
-        Write-Error "Required file not found: $path. Run Sign-RdpFiles.ps1 first."
-        exit 1
-    }
+# Verify signing certificate exists
+$certPath = Join-Path $OutputDir "signing-cert.cer"
+if (-not (Test-Path $certPath)) {
+    Write-Error "Required file not found: $certPath. Run Sign-RdpFiles.ps1 first."
+    exit 1
 }
 
 $usersDir = Join-Path $OutputDir "users"
@@ -77,15 +75,6 @@ if ($Profile -ne "") {
 $s3Base = "s3://${BucketName}/${BucketPrefix}"
 
 Write-Host "Uploading files to $s3Base ..." -ForegroundColor Cyan
-
-# Upload config.json
-Write-Host "  Uploading config.json" -ForegroundColor Gray
-$args = @("s3", "cp", (Join-Path $OutputDir "config.json"), "$s3Base/config.json",
-          "--content-type", "application/json",
-          "--cache-control", "no-cache, no-store, must-revalidate")
-$args += $awsArgs
-& aws @args
-if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upload config.json"; exit 1 }
 
 # Upload signing-cert.cer
 Write-Host "  Uploading signing-cert.cer" -ForegroundColor Gray
@@ -119,7 +108,6 @@ if ($uploadFailed -gt 0) {
 Write-Host ""
 Write-Host "=== Upload Complete ===" -ForegroundColor Green
 Write-Host "Files uploaded:"
-Write-Host "  https://${BucketName}.s3.amazonaws.com/${BucketPrefix}/config.json"
 Write-Host "  https://${BucketName}.s3.amazonaws.com/${BucketPrefix}/signing-cert.cer"
 Write-Host "  https://${BucketName}.s3.amazonaws.com/${BucketPrefix}/users/ ($rdpCount files)"
 Write-Host ""
