@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Orchestrates RDP connection using mstsc.exe with a downloaded .rdp file.

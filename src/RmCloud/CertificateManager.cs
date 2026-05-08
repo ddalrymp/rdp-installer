@@ -1,6 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Manages certificate trust for RDP connections.

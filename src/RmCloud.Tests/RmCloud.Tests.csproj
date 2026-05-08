@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RdpLauncher\RdpLauncher.csproj" />
+    <ProjectReference Include="..\RmCloud\RmCloud.csproj" />
   </ItemGroup>
 
 </Project>

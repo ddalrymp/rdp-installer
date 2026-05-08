@@ -16,6 +16,6 @@
     }
   ],
   "launcherVersion": "1.0.0",
-  "launcherDownloadUrl": "https://your-bucket.s3.amazonaws.com/rdp/RdpLauncherSetup.exe",
+  "launcherDownloadUrl": "https://your-bucket.s3.amazonaws.com/rdp/RmCloudSetup.exe",
   "updatedAt": "2026-04-17T00:00:00Z"
 }

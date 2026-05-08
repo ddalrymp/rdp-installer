@@ -1,4 +1,4 @@
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Settings form: allows users to change Organization, Username, Password.

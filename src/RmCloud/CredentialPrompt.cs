@@ -1,4 +1,4 @@
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Dialog that prompts for Organization, Username, and Password on first launch

@@ -1,7 +1,7 @@
 using Microsoft.Win32;
 using System.Text.Json;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 public sealed class LauncherForm : Form
 {
@@ -23,14 +23,14 @@ public sealed class LauncherForm : Form
         _connectionId = settings.TryGetProperty("ConnectionId", out var connProp)
             ? connProp.GetString() ?? "main-app" : "main-app";
         var appDataFolder = settings.TryGetProperty("AppDataFolder", out var folderProp)
-            ? folderProp.GetString() ?? "RdpLauncher" : "RdpLauncher";
+            ? folderProp.GetString() ?? "RmCloud" : "RmCloud";
         _cacheTtlMinutes = settings.TryGetProperty("ConfigCacheTtlMinutes", out var ttlProp)
             ? ttlProp.GetInt32() : 60;
         _cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             appDataFolder, "cache");
 
-        Logger.Info("=== RDP Launcher starting ===");
+        Logger.Info("=== RM Cloud starting ===");
         Logger.Debug($"ConfigUrl: {_configUrl}");
         Logger.Debug($"ConnectionId: {_connectionId}");
         Logger.Debug($"CacheDir: {_cacheDir}");
@@ -41,7 +41,7 @@ public sealed class LauncherForm : Form
         _credentials.Load();
 
         // --- Form setup ---
-        Text = "RDP Launcher";
+        Text = "RM Cloud";
         Size = new System.Drawing.Size(400, 160);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -234,7 +234,7 @@ public sealed class LauncherForm : Form
         }
 
         _progressBar.Visible = false;
-        MessageBox.Show(message, "RDP Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        MessageBox.Show(message, "RM Cloud", MessageBoxButtons.OK, MessageBoxIcon.Error);
         Close();
     }
 
@@ -269,7 +269,7 @@ public sealed class LauncherForm : Form
         // Try registry first
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(@"Software\RdpLauncher");
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\RmCloud");
             var registryUrl = key?.GetValue("ConfigUrl") as string;
             if (!string.IsNullOrEmpty(registryUrl))
                 return registryUrl;

@@ -6,8 +6,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>RdpLauncher</AssemblyName>
-    <RootNamespace>RdpLauncher</RootNamespace>
+    <AssemblyName>RmCloud</AssemblyName>
+    <RootNamespace>RmCloud</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Version>1.0.0</Version>
     <PublishSingleFile>true</PublishSingleFile>

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace RdpLauncher.Tests;
+namespace RmCloud.Tests;
 
 public class ConfigServiceTests
 {
@@ -8,7 +8,7 @@ public class ConfigServiceTests
 
     public ConfigServiceTests()
     {
-        _testCacheDir = Path.Combine(Path.GetTempPath(), "RdpLauncher_Tests", Guid.NewGuid().ToString("N"));
+        _testCacheDir = Path.Combine(Path.GetTempPath(), "RmCloud_Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testCacheDir);
     }
 

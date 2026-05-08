@@ -1,4 +1,4 @@
-# RDP RemoteApp Launcher & Installer
+# RM Cloud Launcher & Installer
 
 A lightweight Windows launcher that gives clients a **one-click, no-prompts** connection to a published RemoteApp via `mstsc.exe`. Supports **100+ users** via a templated config with `{ORGID}` and `{USERID}` placeholders — a single universal installer works for all organizations. Configuration is hosted as a single `config.json` on S3 and can be updated independently of the installer.
 
@@ -8,12 +8,12 @@ A lightweight Windows launcher that gives clients a **one-click, no-prompts** co
 ┌──────────────────────────┐         ┌──────────────────────────┐
 │   S3 / Web Server        │         │   Client PC              │
 │                          │  HTTPS  │                          │
-│  config.json (template)  │◄────────│  RdpLauncher.exe         │
+│  config.json (template)  │◄────────│  RmCloud.exe         │
 │  users/ORG1_U01.rdp      │         │   ├─ Load OrgId/UserId   │
 │  users/ORG1_U02.rdp      │         │   ├─ Fetch config.json   │
 │  users/...               │         │   ├─ Resolve templates   │
 │  signing-cert.cer        │         │   ├─ Download .rdp file  │
-│  RdpLauncherSetup.exe    │         │   └─ Launch mstsc.exe    │
+│  RmCloudSetup.exe    │         │   └─ Launch mstsc.exe    │
 └──────────────────────────┘         └──────────────────────────┘
 ```
 
@@ -66,10 +66,10 @@ Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on your 
 cd C:\Path\To\rdp-installer
 
 # Update the config URL in appsettings.json to your hosted endpoint
-notepad src\RdpLauncher\appsettings.json
+notepad src\RmCloud\appsettings.json
 
 # Publish the launcher (self-contained, single-file)
-dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publish
+dotnet publish src\RmCloud\RmCloud.csproj -c Release -o installer\publish
 ```
 
 ### 3. Build the Installer
@@ -91,7 +91,7 @@ cd installer
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
 ```
 
-This produces `installer\Output\RdpLauncherSetup.exe`.
+This produces `installer\Output\RmCloudSetup.exe`.
 
 ### 4. Upload & Distribute the Installer
 
@@ -103,17 +103,17 @@ Clients download the installer, run it once, enter their Org ID and User ID when
 
 **Silent install:**
 ```
-RdpLauncherSetup.exe /SILENT /ORGID=ORG1 /USERID=U01
+RmCloudSetup.exe /SILENT /ORGID=ORG1 /USERID=U01
 ```
 
 ## How It Works
 
 **On install:**
-- Launcher `.exe` installed to `%LocalAppData%\RdpLauncher\`
+- Launcher `.exe` installed to `%LocalAppData%\RmCloud\`
 - Signing certificate is imported into `CurrentUser\TrustedPublisher`
 - Org ID and User ID are collected (installer page or `/ORGID` + `/USERID` params) and saved to registry
 - Desktop shortcut and Start Menu entry are created
-- Config URL is written to `HKCU\Software\RdpLauncher\ConfigUrl`
+- Config URL is written to `HKCU\Software\RmCloud\ConfigUrl`
 - RDP consent dialog suppression keys are set
 
 **On each launch:**
@@ -154,7 +154,7 @@ Clients auto-update on next launch ✓
 ```
 rdp-installer/
 ├── src/
-│   ├── RdpLauncher/              # C# .NET 8 WinForms launcher
+│   ├── RmCloud/              # C# .NET 8 WinForms launcher
 │   │   ├── Program.cs            # Entry point
 │   │   ├── LauncherForm.cs       # UI + orchestration (gear icon, workflow)
 │   │   ├── ConfigService.cs      # Fetch, cache & resolve config templates
@@ -166,7 +166,7 @@ rdp-installer/
 │   │   ├── CertificateManager.cs # Import certs to TrustedPublisher
 │   │   ├── UpdateChecker.cs      # Version comparison + update prompt
 │   │   └── appsettings.json      # Default config URL + cache TTL
-│   └── RdpLauncher.Tests/        # xUnit unit tests
+│   └── RmCloud.Tests/        # xUnit unit tests
 ├── installer/
 │   ├── setup.iss                 # Inno Setup script (OrgId + UserId pages)
 │   ├── Prepare-Installer.ps1    # Download signing-cert.cer from S3
@@ -191,13 +191,13 @@ rdp-installer/
   "ConfigUrl": "https://your-bucket.s3.amazonaws.com/rdp/config.json",
   "ConnectionId": "main-app",
   "ConfigCacheTtlMinutes": 60,
-  "AppDataFolder": "RdpLauncher",
+  "AppDataFolder": "RmCloud",
 }
 ```
 
 ### Registry Override
 
-The installer writes the config URL to `HKCU\Software\RdpLauncher\ConfigUrl`. This takes priority over `appsettings.json`, allowing per-machine overrides without modifying the binary.
+The installer writes the config URL to `HKCU\Software\RmCloud\ConfigUrl`. This takes priority over `appsettings.json`, allowing per-machine overrides without modifying the binary.
 
 ## Requirements
 
@@ -216,10 +216,10 @@ A future phase will add macOS support via a `.pkg` installer + shell script usin
 git pull
 
 # 2. Edit config URL
-notepad src\RdpLauncher\appsettings.json
+notepad src\RmCloud\appsettings.json
 
 # 3. Publish .NET app
-dotnet publish src\RdpLauncher\RdpLauncher.csproj -c Release -o installer\publish
+dotnet publish src\RmCloud\RmCloud.csproj -c Release -o installer\publish
 
 # 4. Download signing cert
 cd installer

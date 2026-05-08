@@ -1,4 +1,4 @@
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Downloads and caches .rdp files from the server.
@@ -103,7 +103,7 @@ public sealed class RdpFileManager
     {
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "RdpLauncher");
+            var tempDir = Path.Combine(Path.GetTempPath(), "RmCloud");
             Directory.CreateDirectory(tempDir);
 
             var tempRdpPath = Path.Combine(tempDir, $"session_{Guid.NewGuid():N}.rdp");

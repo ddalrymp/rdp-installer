@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Compares the local launcher version with the server-reported latest version.

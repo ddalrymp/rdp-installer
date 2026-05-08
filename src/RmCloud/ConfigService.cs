@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Represents the server-hosted configuration template.

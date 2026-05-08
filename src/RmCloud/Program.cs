@@ -1,4 +1,4 @@
-namespace RdpLauncher;
+namespace RmCloud;
 
 static class Program
 {
@@ -15,7 +15,7 @@ static class Program
                 Logger.Error("Unhandled UI thread exception", e.Exception);
                 MessageBox.Show(
                     $"An unexpected error occurred:\n\n{e.Exception.Message}",
-                    "RDP Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "RM Cloud", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
@@ -23,7 +23,7 @@ static class Program
                     Logger.Error("Unhandled exception", ex);
             };
 
-            Logger.Info("=== RDP Launcher process starting ===");
+            Logger.Info("=== RM Cloud process starting ===");
 
             if (args.Length > 0 && args[0].Equals("--settings", StringComparison.OrdinalIgnoreCase))
             {
@@ -39,9 +39,9 @@ static class Program
         {
             Logger.Error("Fatal startup exception", ex);
             MessageBox.Show(
-                $"RDP Launcher failed to start:\n\n{ex.Message}\n\n" +
+                $"RM Cloud failed to start:\n\n{ex.Message}\n\n" +
                 $"Log: {Logger.LogFilePath}",
-                "RDP Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "RM Cloud", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

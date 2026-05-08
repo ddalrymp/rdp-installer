@@ -2,7 +2,7 @@ using Microsoft.Win32;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Manages user credentials (Organization, Username, encrypted Password) using the
@@ -11,7 +11,7 @@ namespace RdpLauncher;
 /// </summary>
 public sealed class CredentialManager
 {
-    private const string RegistrySubKey = @"Software\RdpLauncher";
+    private const string RegistrySubKey = @"Software\RmCloud";
 
     public string Organization { get; private set; } = "";
     public string Username { get; private set; } = "";

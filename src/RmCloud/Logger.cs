@@ -1,8 +1,8 @@
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Simple file-based debug logger. Writes timestamped entries to
-/// %LOCALAPPDATA%\RdpLauncher\logs\debug.log with automatic rotation.
+/// %LOCALAPPDATA%\RmCloud\logs\debug.log with automatic rotation.
 /// </summary>
 public static class Logger
 {
@@ -15,7 +15,7 @@ public static class Logger
     {
         LogDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "RdpLauncher", "logs");
+            "RmCloud", "logs");
         LogPath = Path.Combine(LogDir, "debug.log");
     }
 

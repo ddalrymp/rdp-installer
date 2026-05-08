@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Uploads the built RdpLauncherSetup.exe to S3.
+    Uploads the built RmCloudSetup.exe to S3.
 
 .DESCRIPTION
     Uploads the compiled installer to the same S3 bucket used for config and
@@ -15,7 +15,7 @@
     The S3 key prefix / folder path (default: "rdp").
 
 .PARAMETER InstallerPath
-    Path to the compiled installer (default: Output/RdpLauncherSetup.exe relative to script dir).
+    Path to the compiled installer (default: Output/RmCloudSetup.exe relative to script dir).
 
 .PARAMETER Profile
     Optional AWS CLI profile name.
@@ -24,7 +24,7 @@
     .\Deploy-Installer.ps1 -BucketName "my-bucket"
 
 .EXAMPLE
-    .\Deploy-Installer.ps1 -BucketName "my-bucket" -InstallerPath "C:\build\RdpLauncherSetup.exe"
+    .\Deploy-Installer.ps1 -BucketName "my-bucket" -InstallerPath "C:\build\RmCloudSetup.exe"
 #>
 
 [CmdletBinding()]
@@ -34,7 +34,7 @@ param(
 
     [string]$BucketPrefix = "rdp",
 
-    [string]$InstallerPath = (Join-Path $PSScriptRoot "Output\RdpLauncherSetup.exe"),
+    [string]$InstallerPath = (Join-Path $PSScriptRoot "Output\RmCloudSetup.exe"),
 
     [string]$Profile = ""
 )
@@ -66,7 +66,7 @@ if ($Profile -ne "") {
 }
 
 $s3Base = "s3://${BucketName}/${BucketPrefix}"
-$s3Key = "$s3Base/RdpLauncherSetup.exe"
+$s3Key = "$s3Base/RmCloudSetup.exe"
 
 Write-Host "Uploading installer to $s3Key ($fileSize MB) ..." -ForegroundColor Cyan
 
@@ -82,5 +82,5 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=== Upload Complete ===" -ForegroundColor Green
-Write-Host "  https://${BucketName}.s3.amazonaws.com/${BucketPrefix}/RdpLauncherSetup.exe"
+Write-Host "  https://${BucketName}.s3.amazonaws.com/${BucketPrefix}/RmCloudSetup.exe"
 Write-Host ""

@@ -1,21 +1,21 @@
 ; ============================================================
-; RDP Launcher Installer - Inno Setup Script
+; RM Cloud Installer - Inno Setup Script
 ; ============================================================
 ; Build with Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 ;
 ; Before building:
-; 1. Publish the .NET app: dotnet publish src/RdpLauncher -c Release
+; 1. Publish the .NET app: dotnet publish src/RmCloud -c Release
 ; 2. Place the published output in installer/publish/
 ; 3. Place FreeRDP files in installer/freerdp/ (sdl3-freerdp.exe + DLLs)
 ; 4. Place your signing-cert.cer in installer/
 ; 5. (Optional) Place icon.ico in installer/assets/
 ; ============================================================
 
-#define MyAppName "RDP Launcher"
+#define MyAppName "RM Cloud"
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "Your Company Name"
-#define MyAppExeName "RdpLauncher.exe"
-#define MyAppId "RdpLauncher"
+#define MyAppExeName "RmCloud.exe"
+#define MyAppId "RmCloud"
 
 ; TODO: Update this to your actual config URL before building
 #define ConfigUrl "https://your-bucket.s3.amazonaws.com/rdp/config.json"
@@ -28,7 +28,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\{#MyAppId}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=RdpLauncherSetup
+OutputBaseFilename=RmCloudSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest

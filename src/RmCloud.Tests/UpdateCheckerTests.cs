@@ -1,4 +1,4 @@
-namespace RdpLauncher.Tests;
+namespace RmCloud.Tests;
 
 public class UpdateCheckerTests
 {

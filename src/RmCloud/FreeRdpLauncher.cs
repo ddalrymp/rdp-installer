@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace RdpLauncher;
+namespace RmCloud;
 
 /// <summary>
 /// Launches sdl3-freerdp.exe with RAIL (RemoteApp) support.
