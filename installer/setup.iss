@@ -110,10 +110,10 @@ begin
 
     // Update the registry so Add/Remove Programs uses the renamed uninstaller
     RegWriteStringValue(HKEY_CURRENT_USER,
-      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1',
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8F2E4A6B-1C3D-4E5F-9A7B-0D8E6F2A4C1B}_is1',
       'UninstallString', ExpandConstant('"{app}\uninstall\Uninstall.exe"'));
     RegWriteStringValue(HKEY_CURRENT_USER,
-      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1',
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8F2E4A6B-1C3D-4E5F-9A7B-0D8E6F2A4C1B}_is1',
       'QuietUninstallString', ExpandConstant('"{app}\uninstall\Uninstall.exe" /SILENT'));
 
     // Suppress the one-time RDP educational warning dialog (for mstsc fallback)
