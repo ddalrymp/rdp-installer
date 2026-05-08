@@ -34,6 +34,7 @@ SolidCompression=yes
 PrivilegesRequired=lowest
 SetupIconFile=assets\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallFilesDir={app}\uninstall
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -54,6 +55,7 @@ Source: "signing-cert.cer"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{app}\uninstall\Uninstall.exe"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
@@ -102,6 +104,18 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
+    // Rename the uninstaller from unins000.exe to Uninstall.exe
+    RenameFile(ExpandConstant('{app}\uninstall\unins000.exe'), ExpandConstant('{app}\uninstall\Uninstall.exe'));
+    RenameFile(ExpandConstant('{app}\uninstall\unins000.dat'), ExpandConstant('{app}\uninstall\Uninstall.dat'));
+
+    // Update the registry so Add/Remove Programs uses the renamed uninstaller
+    RegWriteStringValue(HKEY_CURRENT_USER,
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1',
+      'UninstallString', ExpandConstant('"{app}\uninstall\Uninstall.exe"'));
+    RegWriteStringValue(HKEY_CURRENT_USER,
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1',
+      'QuietUninstallString', ExpandConstant('"{app}\uninstall\Uninstall.exe" /SILENT'));
+
     // Suppress the one-time RDP educational warning dialog (for mstsc fallback)
     RegWriteDWordValue(HKEY_CURRENT_USER,
       'Software\Microsoft\Terminal Server Client',
