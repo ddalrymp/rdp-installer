@@ -178,7 +178,7 @@ public sealed class LauncherForm : Form
 
             var password = _credentials.GetPassword()!;
             var exitCode = await ProcessLauncher.LaunchAsync(
-                connection, _credentials.Username, password,
+                connection, _credentials.Organization, _credentials.Username, password,
                 _cacheDir, config.FallbackToMstsc);
 
             if (exitCode == -1)

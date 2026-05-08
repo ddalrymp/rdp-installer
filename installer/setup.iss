@@ -53,6 +53,7 @@ Source: "signing-cert.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
@@ -61,6 +62,10 @@ Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "Config
 
 ; Store the install path for reference
 Root: HKCU; Subkey: "Software\{#MyAppId}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
+
+; Register a "Settings" shell verb so right-clicking the exe shows a Settings option
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\settings"; ValueType: string; ValueData: "Settings"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\settings\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --settings"; Flags: uninsdeletekey
 
 [Run]
 ; Remove Mark of the Web (MOTW) from bundled FreeRDP files so SmartScreen does not block them

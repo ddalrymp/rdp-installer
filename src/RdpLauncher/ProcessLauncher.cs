@@ -14,21 +14,21 @@ public static class ProcessLauncher
     /// Returns the exit code, or -1 if launch failed.
     /// </summary>
     public static async Task<int> LaunchAsync(
-        ConnectionInfo connection, string username, string password,
+        ConnectionInfo connection, string organization, string username, string password,
         string cacheDir, bool fallbackToMstsc)
     {
         LastError = null;
         Logger.Info("ProcessLauncher.LaunchAsync started");
         Logger.Debug($"  Connection: {connection.ServerAddress}:{connection.Port}");
 
-        return await LaunchMstscAsync(connection, username, password, cacheDir);
+        return await LaunchMstscAsync(connection, organization, username, password, cacheDir);
     }
 
     /// <summary>
     /// Launches mstsc.exe using a downloaded .rdp file.
     /// </summary>
     private static async Task<int> LaunchMstscAsync(
-        ConnectionInfo connection, string username, string password, string cacheDir)
+        ConnectionInfo connection, string organization, string username, string password, string cacheDir)
     {
         Logger.Info("LaunchMstscAsync started");
 
@@ -49,7 +49,7 @@ public static class ProcessLauncher
 
         // Download/use cached .rdp file
         var rdpManager = new RdpFileManager(cacheDir);
-        var rdpPath = await rdpManager.EnsureRdpFileAsync(connection, null, username);
+        var rdpPath = await rdpManager.EnsureRdpFileAsync(connection, null, organization, username);
 
         if (rdpPath == null)
         {
@@ -68,9 +68,10 @@ public static class ProcessLauncher
 
         // Store credential via cmdkey so mstsc auto-authenticates
         var credTarget = $"TERMSRV/{connection.ServerAddress}";
+        var credentialUsername = $"{organization}_{username}";
         try
         {
-            StoreCmdKeyCredential(credTarget, username, password);
+            StoreCmdKeyCredential(credTarget, credentialUsername, password);
         }
         catch (Exception ex)
         {

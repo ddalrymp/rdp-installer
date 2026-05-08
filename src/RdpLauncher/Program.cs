@@ -3,7 +3,7 @@ namespace RdpLauncher;
 static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         try
         {
@@ -24,6 +24,15 @@ static class Program
             };
 
             Logger.Info("=== RDP Launcher process starting ===");
+
+            if (args.Length > 0 && args[0].Equals("--settings", StringComparison.OrdinalIgnoreCase))
+            {
+                var credentials = new CredentialManager();
+                credentials.Load();
+                Application.Run(new SettingsForm(credentials));
+                return;
+            }
+
             Application.Run(new LauncherForm());
         }
         catch (Exception ex)

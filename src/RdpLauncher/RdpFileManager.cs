@@ -25,17 +25,17 @@ public sealed class RdpFileManager
     /// Downloads a new one if the thumbprint has changed, otherwise uses the cache.
     /// Returns the path to the .rdp file, or null on failure.
     /// </summary>
-    public async Task<string?> EnsureRdpFileAsync(ConnectionInfo connection, string? cachedThumbprint, string? userId = null)
+    public async Task<string?> EnsureRdpFileAsync(ConnectionInfo connection, string? cachedThumbprint, string? orgId = null, string? userId = null)
     {
         LastError = null;
-        var cacheFileName = !string.IsNullOrEmpty(userId) ? $"{userId}.rdp" : $"{connection.Id}.rdp";
+        var rdpUrl = ResolveRdpUrl(connection, orgId, userId);
+        var cacheFileName = GetFileNameFromUrl(rdpUrl) ?? $"{connection.Id}.rdp";
         var cachedRdpPath = Path.Combine(_cacheDir, cacheFileName);
         var thumbprintChanged = !string.Equals(
             connection.CertThumbprint, cachedThumbprint, StringComparison.OrdinalIgnoreCase);
 
         if (thumbprintChanged || !File.Exists(cachedRdpPath))
         {
-            var rdpUrl = ResolveRdpUrl(connection, userId);
             if (string.IsNullOrEmpty(rdpUrl))
             {
                 LastError = $"No download URL resolved. userId=\"{userId}\", " +
@@ -59,14 +59,31 @@ public sealed class RdpFileManager
     }
 
     /// <summary>
+    /// Extracts the filename from a URL path (e.g. "jsmith.rdp" from ".../users/jsmith.rdp").
+    /// Returns null if the URL is invalid or has no filename.
+    /// </summary>
+    internal static string? GetFileNameFromUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return null;
+
+        var fileName = Path.GetFileName(uri.LocalPath);
+        return string.IsNullOrEmpty(fileName) ? null : fileName;
+    }
+
+    /// <summary>
     /// Resolves the .rdp download URL from the connection config.
     /// Prefers rdpFileUrlPattern (with {userId} substitution) over the legacy rdpFileUrl.
     /// </summary>
-    internal static string? ResolveRdpUrl(ConnectionInfo connection, string? userId)
+    internal static string? ResolveRdpUrl(ConnectionInfo connection, string? orgId, string? userId)
     {
         if (!string.IsNullOrEmpty(connection.RdpFileUrlPattern) && !string.IsNullOrEmpty(userId))
         {
-            return connection.RdpFileUrlPattern.Replace("{userId}", userId, StringComparison.OrdinalIgnoreCase);
+            return connection.RdpFileUrlPattern
+                .Replace("{orgId}", orgId ?? "", StringComparison.OrdinalIgnoreCase)
+                .Replace("{org}", orgId ?? "", StringComparison.OrdinalIgnoreCase)
+                .Replace("{userId}", userId, StringComparison.OrdinalIgnoreCase)
+                .Replace("{username}", userId, StringComparison.OrdinalIgnoreCase);
         }
 
         // Fall back to legacy single-file URL

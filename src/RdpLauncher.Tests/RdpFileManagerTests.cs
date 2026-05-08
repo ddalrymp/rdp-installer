@@ -60,11 +60,11 @@ public class RdpFileManagerTests
         {
             Id = "main-app",
             CertThumbprint = "AABB",
-            RdpFileUrlPattern = "https://localhost:1/users/{userId}.rdp"
+            RdpFileUrlPattern = "https://localhost:1/users/{ORGID}_{USERID}.rdp"
         };
 
         var manager = new RdpFileManager(_testCacheDir);
-        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: "AABB", userId: "ORG1_U01");
+        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: "AABB", orgId: "ORG1", userId: "U01");
 
         Assert.NotNull(result);
         Assert.Equal(cachedPath, result);
@@ -81,12 +81,12 @@ public class RdpFileManagerTests
         {
             Id = "main-app",
             CertThumbprint = "NEWTHUMB",
-            RdpFileUrlPattern = "https://localhost:1/users/{userId}.rdp"
+            RdpFileUrlPattern = "https://localhost:1/users/{ORGID}_{USERID}.rdp"
         };
 
         var manager = new RdpFileManager(_testCacheDir);
         // Thumbprint differs, so it will try to download, fail, and fall back to cache
-        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: "OLDTHUMB", userId: "ORG1_U01");
+        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: "OLDTHUMB", orgId: "ORG1", userId: "U01");
 
         Assert.NotNull(result);
         Assert.Equal(cachedPath, result);
@@ -102,11 +102,11 @@ public class RdpFileManagerTests
         {
             Id = "main-app",
             CertThumbprint = "AABB",
-            RdpFileUrlPattern = "https://localhost:1/users/{userId}.rdp"
+            RdpFileUrlPattern = "https://localhost:1/users/{ORGID}_{USERID}.rdp"
         };
 
         var manager = new RdpFileManager(emptyCache);
-        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: null, userId: "ORG1_U01");
+        var result = await manager.EnsureRdpFileAsync(connection, cachedThumbprint: null, orgId: "ORG1", userId: "U01");
 
         Assert.Null(result);
     }
@@ -114,8 +114,8 @@ public class RdpFileManagerTests
     [Fact]
     public async Task EnsureRdpFileAsync_FallsBackToLegacyUrl_WhenNoUserId()
     {
-        // Pre-create a cached .rdp file named by connection id (legacy behavior)
-        var cachedPath = Path.Combine(_testCacheDir, "main-app.rdp");
+        // Pre-create a cached .rdp file named by the filename in the URL
+        var cachedPath = Path.Combine(_testCacheDir, "app.rdp");
         File.WriteAllText(cachedPath, "full address:s:test.example.com:3389");
 
         var connection = new ConnectionInfo
@@ -137,11 +137,11 @@ public class RdpFileManagerTests
     {
         var connection = new ConnectionInfo
         {
-            RdpFileUrlPattern = "https://example.com/users/{userId}.rdp",
+            RdpFileUrlPattern = "https://example.com/users/{ORGID}_{USERID}.rdp",
             RdpFileUrl = "https://example.com/app.rdp"
         };
 
-        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1_U01");
+        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1", "U01");
 
         Assert.Equal("https://example.com/users/ORG1_U01.rdp", url);
     }
@@ -151,11 +151,11 @@ public class RdpFileManagerTests
     {
         var connection = new ConnectionInfo
         {
-            RdpFileUrlPattern = "https://example.com/users/{userId}.rdp",
+            RdpFileUrlPattern = "https://example.com/users/{ORGID}_{USERID}.rdp",
             RdpFileUrl = "https://example.com/app.rdp"
         };
 
-        var url = RdpFileManager.ResolveRdpUrl(connection, null);
+        var url = RdpFileManager.ResolveRdpUrl(connection, null, null);
 
         Assert.Equal("https://example.com/app.rdp", url);
     }
@@ -168,7 +168,7 @@ public class RdpFileManagerTests
             RdpFileUrl = "https://example.com/app.rdp"
         };
 
-        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1_U01");
+        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1", "U01");
 
         Assert.Equal("https://example.com/app.rdp", url);
     }
@@ -178,7 +178,7 @@ public class RdpFileManagerTests
     {
         var connection = new ConnectionInfo();
 
-        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1_U01");
+        var url = RdpFileManager.ResolveRdpUrl(connection, "ORG1", "U01");
 
         Assert.Null(url);
     }

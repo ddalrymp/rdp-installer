@@ -167,7 +167,7 @@ public sealed class ConfigService
             GatewayHostname = Substitute(template.GatewayHostname, orgId, userId),
             CertThumbprint = template.CertThumbprint,
             RdpFileUrl = Substitute(template.RdpFileUrl, orgId, userId),
-            RdpFileUrlPattern = Substitute(template.RdpFileUrlPattern, orgId, userId),
+            RdpFileUrlPattern = template.RdpFileUrlPattern,  // left unresolved — RdpFileManager handles substitution
             SigningCertUrl = Substitute(template.SigningCertUrl, orgId, userId),
             Domain = Substitute(template.Domain, orgId, userId)
         };

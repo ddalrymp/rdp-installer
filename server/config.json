@@ -11,7 +11,7 @@
       "remoteAppCmdLine": "",
       "gatewayHostname": "",
       "certThumbprint": "AB12CD34EF56789012345678901234567890ABCD",
-      "rdpFileUrlPattern": "https://your-bucket.s3.amazonaws.com/rdp/users/{userId}.rdp",
+      "rdpFileUrlPattern": "https://your-bucket.s3.amazonaws.com/rdp/users/{ORGID}_{USERID}.rdp",
       "signingCertUrl": "https://your-bucket.s3.amazonaws.com/rdp/signing-cert.cer"
     }
   ],
