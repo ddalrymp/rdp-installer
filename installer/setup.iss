@@ -49,14 +49,17 @@ Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 ; FreeRDP binaries (bundled, pinned version)
 Source: "freerdp\*"; DestDir: "{app}\freerdp"; Flags: ignoreversion recursesubdirs
 
+; Application icon (used by shortcuts)
+Source: "assets\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+
 ; Signing certificate for RDP trust (mstsc fallback)
 Source: "signing-cert.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"
+Name: "{group}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"; IconFilename: "{app}\icon.ico"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{app}\uninstall\Uninstall.exe"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\icon.ico"
 
 [Registry]
 ; Store the config URL so the launcher can find it
